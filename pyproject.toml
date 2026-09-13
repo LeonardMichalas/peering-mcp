@@ -1,0 +1,108 @@
+[project]
+name = "peering-mcp"
+version = "0.1.0"
+description = "An MCP server that gives AI agents access to public internet interconnection data: who peers with whom, where, and under what policy."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Leonard Michalas" }]
+keywords = ["mcp", "model-context-protocol", "peeringdb", "peering", "bgp", "asn", "networking", "rdap"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Networking",
+]
+dependencies = [
+    "mcp>=1.2",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "diskcache>=5.6",
+    "tenacity>=9.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/LeonardMichalas/peering-mcp"
+Issues = "https://github.com/LeonardMichalas/peering-mcp/issues"
+
+[project.scripts]
+peering-mcp = "peering_mcp.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "respx>=0.21",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/peering_mcp"]
+
+# --- Lint and format -------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "N",        # pep8-naming
+    "UP",       # pyupgrade
+    "B",        # bugbear
+    "A",        # builtins shadowing
+    "C4",       # comprehensions
+    "SIM",      # simplify
+    "PTH",      # use pathlib
+    "RUF",      # ruff-specific
+    "ASYNC",    # async correctness
+    "S",        # bandit security
+]
+ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B018"]
+
+# --- Types -----------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+warn_unused_ignores = true
+disallow_any_generics = true
+no_implicit_reexport = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["diskcache.*"]
+ignore_missing_imports = true
+
+# --- Tests -----------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "live: hits the real upstream API; opt-in, never runs in CI",
+]
+
+[tool.coverage.run]
+source = ["src/peering_mcp"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

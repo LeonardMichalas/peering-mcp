@@ -1,0 +1,33 @@
+# Runs before every commit. Install once with: uv run pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        # Guards against accidental binaries and data dumps. uv.lock is a
+        # legitimate lockfile that must be committed, so it is exempt rather
+        # than the threshold being raised for everything.
+        args: ["--maxkb=200"]
+        exclude: ^uv\.lock$
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict, src only)
+        entry: uv run mypy src
+        language: system
+        pass_filenames: false
+        types: [python]
