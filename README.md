@@ -4,7 +4,7 @@
 
 > **Status: early development.** The foundation and quality gate are in place. Tools land next. Nothing is published to PyPI yet.
 
-> **A personal project.** Built in my own free time, out of curiosity about the Model Context Protocol. See [About this project](#about-this-project).
+> A personal side project, written in my own free time.
 
 ## Why this exists
 
@@ -192,14 +192,6 @@ Issues and pull requests are welcome. Before opening a PR:
 1. `uv run pytest`, `uv run ruff check .` and `uv run mypy src` all pass.
 2. New behaviour has a test at the appropriate level.
 3. The change respects the design principles above. In particular, a tool that returns a large or unshaped response, or that could pass raw upstream free text to a model, will be sent back.
-
-## About this project
-
-This is a personal side project, written in my own free time because I wanted to understand the Model Context Protocol by building something real with it rather than reading about it.
-
-It is not affiliated with, sponsored by, or connected to my employer or any other organisation. It uses only data that PeeringDB and the regional internet registries publish openly for anyone to use. No proprietary, internal or commercially sensitive information is involved anywhere in it.
-
-Opinions, design decisions and mistakes here are entirely my own.
 
 ## Licence
 
