@@ -2,7 +2,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** The foundation and quality gate are in place. Tools land next. Nothing is published to PyPI yet.
+> **Status: early development.** `lookup_network` works against live data. The other four tools are next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -14,19 +14,51 @@ None of it is reachable by an AI agent. Ask a coding assistant which internet ex
 
 This server is that way to check.
 
-## What it will do
+## What it does
 
-| Tool | Question it answers |
-| --- | --- |
-| `lookup_network` | Who is this network, and what is their peering policy? |
-| `list_presence` | Which internet exchanges and facilities are they present at? |
-| `find_at_exchange` | Who else is at this exchange, and would they peer? |
-| `find_common_presence` | **Where can these networks meet each other?** |
-| `lookup_registration` | Who is this IP range or AS number registered to? |
+| Tool | Question it answers | |
+| --- | --- | --- |
+| `lookup_network` | Who is this network, and what is their peering policy? | ✅ |
+| `list_presence` | Which internet exchanges and facilities are they present at? | planned |
+| `find_at_exchange` | Who else is at this exchange, and would they peer? | planned |
+| `find_common_presence` | **Where can these networks meet each other?** | planned |
+| `lookup_registration` | Who is this IP range or AS number registered to? | planned |
 
 `find_common_presence` is the tool that motivated the project. Working out where two or more networks could interconnect means looking each one up, listing everywhere it is present, and intersecting the results by hand. That is about an hour and a dozen browser tabs. It should be one question.
 
 It also returns how many locations each network has on its own, so an empty answer is explainable: either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
+
+### What a result looks like
+
+Asking `lookup_network` for `AS3320` returns 909 bytes, not the 42-field upstream record:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "network": {
+      "asn": 3320,
+      "name": "Deutsche Telekom",
+      "network_type": "NSP",
+      "scope": "Global",
+      "exchange_count": 7,
+      "facility_count": 53,
+      "policy": {
+        "general": "Restrictive",
+        "contract_required": "Required",
+        "ratio_required": true
+      }
+    }
+  },
+  "note": "PeeringDB records are maintained by the networks themselves. Treat a missing field as unrecorded, not as evidence it is untrue.",
+  "provenance": {
+    "source": "peeringdb",
+    "record_updated": "2026-08-31T13:30:19Z"
+  }
+}
+```
+
+An ambiguous name returns candidates rather than a guess, and an unlisted AS number returns `not_found` with a note saying a network can route traffic without being registered.
 
 ## How it works
 
@@ -104,6 +136,31 @@ Later versions may add observed routing data from [RIPEstat](https://stat.ripe.n
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
 - Optionally a free [PeeringDB API key](https://docs.peeringdb.com/howto/api_keys/), which raises the rate limit
+
+## Use it with an agent
+
+Until it is published, point your agent at a local checkout.
+
+**Claude Code:**
+
+```bash
+claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mcp
+```
+
+**Anything that reads a JSON MCP config:**
+
+```json
+{
+  "mcpServers": {
+    "peering-mcp": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/peering-mcp", "peering-mcp"]
+    }
+  }
+}
+```
+
+Then ask it something an agent normally gets wrong: *"What is Deutsche Telekom's peering policy, and how many internet exchanges are they at?"*
 
 ## Development
 
