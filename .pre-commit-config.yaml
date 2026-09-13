@@ -31,3 +31,15 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+
+      - id: check-docs
+        # Fails when the README, the task list or the generated private copies
+        # disagree with what the code actually does. Added after T4, where five
+        # documents were stale at once and the test suite was entirely green.
+        # Skipped automatically when the vault is not present, so a contributor
+        # who clones this repo is never blocked by it.
+        name: documentation has not drifted
+        entry: tasks/check-docs.sh
+        language: script
+        pass_filenames: false
+        always_run: true
