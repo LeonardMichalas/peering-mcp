@@ -14,23 +14,6 @@ None of it is reachable by an AI agent. Ask a coding assistant which internet ex
 
 This server is that way to check.
 
-```mermaid
-graph LR
-    subgraph before["Without this server"]
-        Q1["Which exchanges is<br/>this network at?"] --> M1["Agent answers<br/>from memory"]
-        M1 --> A1["Fluent.<br/>Sometimes wrong.<br/>No source."]
-    end
-
-    subgraph after["With this server"]
-        Q2["Which exchanges is<br/>this network at?"] --> M2["Agent calls a tool"]
-        M2 --> P["PeeringDB"]
-        P --> A2["Checked.<br/>Cited.<br/>Says when unknown."]
-    end
-
-    style A1 fill:#a33,color:#fff
-    style A2 fill:#2a6,color:#fff
-```
-
 ## What it will do
 
 | Tool | Question it answers |
@@ -43,19 +26,7 @@ graph LR
 
 `find_common_presence` is the tool that motivated the project. Working out where two or more networks could interconnect means looking each one up, listing everywhere it is present, and intersecting the results by hand. That is about an hour and a dozen browser tabs. It should be one question.
 
-```mermaid
-graph TD
-    Q["Where can AS3320, AS6695<br/>and AS20940 meet?"]
-    Q --> T["find_common_presence"]
-    T --> F["One PeeringDB query<br/>filtered to all three ASNs"]
-    F --> I["Intersect their<br/>exchanges and facilities"]
-    I --> R["Shared locations<br/>+ per-network totals<br/>+ source and age"]
-
-    style T fill:#2d6a9f,color:#fff
-    style R fill:#2a6,color:#fff
-```
-
-The per-network totals matter. If the answer is empty, they tell the agent *why* — either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
+It also returns how many locations each network has on its own, so an empty answer is explainable: either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
 
 ## How it works
 
