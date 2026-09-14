@@ -33,6 +33,11 @@ def isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     Found the hard way: wiring the cache in turned seventeen tests red at once,
     all of them serving a previous test's response.
+
+    The switch is cleared rather than inherited, so what the suite proves does
+    not depend on who is running it. CI had `PEERING_MCP_NO_CACHE` set, which
+    meant the cache tests passed on a developer's machine and nowhere else.
     """
+    monkeypatch.delenv("PEERING_MCP_NO_CACHE", raising=False)
     monkeypatch.setattr(cache_module, "default_cache_dir", lambda: tmp_path / "cache")
     monkeypatch.setenv("PEERING_MCP_CACHE_DIR", str(tmp_path / "cache"))

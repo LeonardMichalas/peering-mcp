@@ -13,10 +13,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Never let CI reach the real upstream API.
-  PEERING_MCP_NO_CACHE: "1"
-
 jobs:
   quality:
     name: Lint, types and tests
