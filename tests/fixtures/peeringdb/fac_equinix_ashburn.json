@@ -1,0 +1,51 @@
+{
+  "data": [
+    {
+      "id": 1,
+      "org_id": 2,
+      "org_name": "Equinix, Inc.",
+      "campus_id": 14,
+      "name": "Equinix DC1-DC15,DC21-DC22 - Ashburn",
+      "aka": "",
+      "name_long": "",
+      "website": "http://www.equinix.com/",
+      "social_media": [
+        {
+          "service": "website",
+          "identifier": "http://www.equinix.com/"
+        }
+      ],
+      "clli": "ASBNVA",
+      "rencode": "",
+      "npanxx": "703-723",
+      "notes": "",
+      "net_count": 515,
+      "ix_count": 8,
+      "carrier_count": 14,
+      "sales_email": "",
+      "sales_phone": "",
+      "tech_email": "",
+      "tech_phone": "",
+      "available_voltage_services": [],
+      "diverse_serving_substations": null,
+      "property": "",
+      "region_continent": "North America",
+      "status_dashboard": "",
+      "logo": null,
+      "created": "2010-07-29T00:00:00Z",
+      "updated": "2026-02-12T20:01:14Z",
+      "status": "ok",
+      "address1": "21715 Filigree Ct",
+      "address2": "Building F",
+      "city": "Ashburn",
+      "country": "US",
+      "state": "VA",
+      "zipcode": "20147-6205",
+      "floor": "",
+      "suite": "",
+      "latitude": 39.016363,
+      "longitude": -77.459023
+    }
+  ],
+  "meta": {}
+}

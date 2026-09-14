@@ -1,0 +1,41 @@
+{
+  "meta": {},
+  "data": [
+    {
+      "id": 297,
+      "name": "Equinix DC1-DC15,DC21-DC22 - Ashburn",
+      "city": "Ashburn",
+      "country": "US",
+      "net_id": 196,
+      "fac_id": 1,
+      "local_asn": 3320,
+      "created": "2010-07-29T00:00:00Z",
+      "updated": "2016-03-14T20:26:09Z",
+      "status": "ok"
+    },
+    {
+      "id": 307,
+      "name": "Equinix SV8 - Silicon Valley, Palo Alto",
+      "city": "Palo Alto",
+      "country": "US",
+      "net_id": 196,
+      "fac_id": 5,
+      "local_asn": 3320,
+      "created": "2010-07-29T00:00:00Z",
+      "updated": "2016-03-14T21:31:34Z",
+      "status": "ok"
+    },
+    {
+      "id": 300,
+      "name": "Equinix LA1 - Los Angeles",
+      "city": "Los Angeles",
+      "country": "US",
+      "net_id": 196,
+      "fac_id": 8,
+      "local_asn": 3320,
+      "created": "2010-07-29T00:00:00Z",
+      "updated": "2016-03-14T21:31:33Z",
+      "status": "ok"
+    }
+  ]
+}

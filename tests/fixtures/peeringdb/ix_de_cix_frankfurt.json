@@ -1,0 +1,47 @@
+{
+  "data": [
+    {
+      "id": 31,
+      "org_id": 1187,
+      "name": "DE-CIX Frankfurt",
+      "aka": "DE-CIX FRA",
+      "name_long": "DE-CIX Frankfurt",
+      "city": "Frankfurt",
+      "country": "DE",
+      "region_continent": "Europe",
+      "media": "Ethernet",
+      "notes": "For peering with the DE-CIX Frankfurt route servers, please see:\n\n[DE-CIX Frankfurt Route Servers](https://www.peeringdb.com/net/947)",
+      "proto_unicast": true,
+      "proto_multicast": false,
+      "proto_ipv6": true,
+      "website": "https://www.de-cix.net/en/locations/germany/frankfurt",
+      "social_media": [
+        {
+          "service": "website",
+          "identifier": "https://www.de-cix.net/en/locations/germany/frankfurt"
+        }
+      ],
+      "url_stats": "https://www.de-cix.net/en/locations/frankfurt/statistics",
+      "tech_email": "support@de-cix.net",
+      "tech_phone": "+4969173090211",
+      "policy_email": "sales@de-cix.net",
+      "policy_phone": "+4969173090212",
+      "sales_phone": "",
+      "sales_email": "",
+      "net_count": 1018,
+      "fac_count": 26,
+      "ixf_net_count": 1047,
+      "ixf_last_import": "2026-02-17T22:35:14Z",
+      "ixf_import_request": "2026-02-17T22:34:32Z",
+      "ixf_import_request_status": "finished",
+      "service_level": "24/7 Support",
+      "terms": "Recurring Fees",
+      "status_dashboard": "",
+      "logo": null,
+      "created": "2010-07-29T00:00:00Z",
+      "updated": "2025-06-17T21:28:31Z",
+      "status": "ok"
+    }
+  ],
+  "meta": {}
+}

@@ -1,16 +1,16 @@
 """The `lookup_network` tool.
 
 Resolves an AS number or a name fragment to a network, with its peering policy.
-Deliberately shapes the upstream record down: PeeringDB returns 42 fields per
-network, most of which are internal identifiers or free text with no decision
-value, and passing them through would cost the caller context for nothing.
+
+This module owns two things and nothing else: turning a caller's query into a
+client call, and turning what comes back — including what goes wrong — into the
+envelope. Validating the upstream response belongs to `clients/peeringdb.py`,
+and deciding what is worth returning belongs to `shaping.py`.
 """
 
 from __future__ import annotations
 
 import re
-from datetime import datetime
-from typing import Any
 
 from peering_mcp.clients.peeringdb import NAME_MATCH_LIMIT, PeeringDBClient
 from peering_mcp.errors import (
@@ -19,14 +19,12 @@ from peering_mcp.errors import (
     UpstreamRateLimitedError,
 )
 from peering_mcp.models.domain import (
-    Network,
     NetworkLookup,
-    NetworkMatch,
-    PeeringPolicy,
     Provenance,
     Status,
     ToolResult,
 )
+from peering_mcp.shaping import shape_network, shape_network_match
 
 #: The valid 32-bit AS number range. 0 and 4294967295 are reserved.
 _MIN_ASN = 1
@@ -52,68 +50,6 @@ def parse_asn(query: str) -> int | None:
     if not _MIN_ASN <= value <= _MAX_ASN:
         return None
     return value
-
-
-def _text(record: dict[str, Any], key: str) -> str | None:
-    """Read a string field, treating empty strings as absent.
-
-    PeeringDB uses `""` and `null` interchangeably for "not filled in", and the
-    difference is never meaningful.
-    """
-    value = record.get(key)
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
-
-
-def _integer(record: dict[str, Any], key: str) -> int | None:
-    value = record.get(key)
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
-
-
-def _timestamp(record: dict[str, Any], key: str) -> datetime | None:
-    raw = _text(record, key)
-    if raw is None:
-        return None
-    try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
-def shape_network(record: dict[str, Any]) -> Network:
-    """Turn a PeeringDB network record into the compact form callers get.
-
-    Dropped on purpose: `notes` and `aka` are free text written by the network
-    itself with no decision value, and they are the obvious place to hide
-    instructions aimed at whatever model reads this. Internal identifiers,
-    logos and social media are dropped because nobody asks about them.
-    """
-    ratio_required = record.get("policy_ratio")
-    return Network(
-        asn=_integer(record, "asn") or 0,
-        name=_text(record, "name") or "(unnamed)",
-        long_name=_text(record, "name_long"),
-        website=_text(record, "website"),
-        network_type=_text(record, "info_type"),
-        traffic_estimate=_text(record, "info_traffic"),
-        scope=_text(record, "info_scope"),
-        traffic_ratio=_text(record, "info_ratio"),
-        ipv4_prefixes=_integer(record, "info_prefixes4"),
-        ipv6_prefixes=_integer(record, "info_prefixes6"),
-        exchange_count=_integer(record, "ix_count"),
-        facility_count=_integer(record, "fac_count"),
-        policy=PeeringPolicy(
-            general=_text(record, "policy_general"),
-            locations=_text(record, "policy_locations"),
-            ratio_required=ratio_required if isinstance(ratio_required, bool) else None,
-            contract_required=_text(record, "policy_contracts"),
-            url=_text(record, "policy_url"),
-        ),
-        irr_as_set=_text(record, "irr_as_set"),
-        looking_glass=_text(record, "looking_glass"),
-    )
 
 
 async def lookup_network(client: PeeringDBClient, query: str) -> ToolResult[NetworkLookup]:
@@ -160,7 +96,7 @@ async def _by_asn(client: PeeringDBClient, asn: int) -> ToolResult[NetworkLookup
         status=Status.OK,
         data=NetworkLookup(network=shape_network(record)),
         note=_SELF_REPORTED,
-        provenance=Provenance.now("peeringdb", record_updated=_timestamp(record, "updated")),
+        provenance=Provenance.now("peeringdb", record_updated=record.updated),
     )
 
 
@@ -179,13 +115,10 @@ async def _by_name(client: PeeringDBClient, fragment: str) -> ToolResult[Network
             status=Status.OK,
             data=NetworkLookup(network=shape_network(record)),
             note=_SELF_REPORTED,
-            provenance=Provenance.now("peeringdb", record_updated=_timestamp(record, "updated")),
+            provenance=Provenance.now("peeringdb", record_updated=record.updated),
         )
 
-    candidates = [
-        NetworkMatch(asn=_integer(row, "asn") or 0, name=_text(row, "name") or "(unnamed)")
-        for row in records[:NAME_MATCH_LIMIT]
-    ]
+    candidates = [shape_network_match(row) for row in records[:NAME_MATCH_LIMIT]]
     note = (
         f"{len(records)} networks match {fragment!r}. "
         "Pick one and call this tool again with its AS number."

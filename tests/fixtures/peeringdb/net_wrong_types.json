@@ -1,0 +1,20 @@
+{
+  "meta": {},
+  "data": [
+    {
+      "asn": "65003",
+      "name": "Loosely Typed Net",
+      "name_long": 12345,
+      "website": null,
+      "info_type": "NSP",
+      "info_prefixes4": "1200",
+      "info_prefixes6": [],
+      "ix_count": 4.0,
+      "fac_count": null,
+      "policy_general": "Open",
+      "policy_ratio": "yes",
+      "updated": "not a timestamp",
+      "a_field_invented_next_year": {"nested": true}
+    }
+  ]
+}
