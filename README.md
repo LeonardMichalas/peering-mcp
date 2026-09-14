@@ -62,50 +62,19 @@ The `status` field is the first thing to read, and `ok` means one thing only: th
 
 ## How it works
 
-```mermaid
-graph LR
-    subgraph local["Your machine"]
-        A["AI agent<br/>Claude Code, Codex,<br/>Cursor, …"]
-        S["peering-mcp"]
-        C[("Disk cache")]
-    end
-    subgraph public["Public APIs"]
-        P["PeeringDB<br/>1 request/second"]
-        R["RDAP"]
-    end
-
-    A -->|stdio| S
-    S <--> C
-    S -->|HTTPS| P
-    S -->|HTTPS| R
-
-    style S fill:#2d6a9f,color:#fff
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.png">
+  <img alt="The agent talks to peering-mcp over stdio. Only the server reaches the public internet, sending HTTPS GET requests to PeeringDB and RDAP, and reading from and writing to a local disk cache." src="docs/images/architecture-light.png">
+</picture>
 
 The agent never reaches the internet itself. Everything goes through the server, which is the only place rate limiting, caching, validation and sanitisation can actually be enforced.
 
 A request takes one of two paths:
 
-```mermaid
-sequenceDiagram
-    participant A as Agent
-    participant S as peering-mcp
-    participant C as Cache
-    participant P as PeeringDB
-
-    A->>S: look up a network
-    S->>C: seen this recently?
-    alt cached
-        C-->>S: yes
-    else not cached
-        S->>S: wait for the rate limiter
-        S->>P: GET
-        P-->>S: JSON (can be 130 KB)
-        S->>S: validate, sanitise, shape
-        S->>C: store
-    end
-    S-->>A: compact result + source + age
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/request-dark.png">
+  <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.png">
+</picture>
 
 That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task.
 

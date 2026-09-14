@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "What one lookup actually does",
+    "output": "../request.html",
+    "viewBox": [
+      1080,
+      545
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "cache-check",
+        "label": "Ask the cache first",
+        "focus": [
+          "agent",
+          "server",
+          "cache"
+        ],
+        "note": "Every request starts here. A hit ends the story at this point."
+      },
+      {
+        "id": "upstream-call",
+        "label": "Only on a miss",
+        "focus": [
+          "server",
+          "peeringdb"
+        ],
+        "note": "The rate limiter is waited on before the request is sent, not after."
+      },
+      {
+        "id": "shape-and-return",
+        "label": "Shape, store, return",
+        "focus": [
+          "server",
+          "cache",
+          "agent"
+        ],
+        "note": "130 KB upstream becomes 854 bytes in the agent's context window."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "AI agent",
+      "sublabel": "MCP client"
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "peering-mcp",
+      "sublabel": "tool handler"
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Disk cache",
+      "sublabel": "24 h by default"
+    },
+    {
+      "id": "peeringdb",
+      "type": "cloud",
+      "label": "PeeringDB",
+      "sublabel": "API v2"
+    }
+  ],
+  "segments": [
+    {
+      "from": 168,
+      "to": 262,
+      "label": "Cache check (a hit ends here)"
+    },
+    {
+      "from": 286,
+      "to": 372,
+      "label": "On a miss only"
+    },
+    {
+      "from": 392,
+      "to": 470,
+      "label": "Shape, store, return"
+    }
+  ],
+  "messages": [
+    {
+      "id": "ask",
+      "from": "agent",
+      "to": "server",
+      "y": 180,
+      "label": "look up AS3320",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cache-read",
+      "from": "server",
+      "to": "cache",
+      "y": 215,
+      "label": "seen this recently?",
+      "variant": "default"
+    },
+    {
+      "id": "cache-miss",
+      "from": "cache",
+      "to": "server",
+      "y": 245,
+      "label": "miss",
+      "variant": "return"
+    },
+    {
+      "id": "upstream-get",
+      "from": "server",
+      "to": "peeringdb",
+      "y": 305,
+      "label": "GET, after waiting for the rate limiter",
+      "variant": "emphasis",
+      "note": "One request per second, held to by the server itself"
+    },
+    {
+      "id": "upstream-json",
+      "from": "peeringdb",
+      "to": "server",
+      "y": 345,
+      "label": "JSON, which can be 130 KB",
+      "variant": "return"
+    },
+    {
+      "id": "cache-write",
+      "from": "server",
+      "to": "cache",
+      "y": 408,
+      "label": "store",
+      "variant": "dashed",
+      "note": "Validated, sanitised and shaped before it is stored"
+    },
+    {
+      "id": "answer",
+      "from": "server",
+      "to": "agent",
+      "y": 448,
+      "label": "854 bytes, with source and age",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "server",
+      "from": 178,
+      "to": 454,
+      "type": "backend"
+    },
+    {
+      "participant": "cache",
+      "from": 210,
+      "to": 251,
+      "type": "database"
+    },
+    {
+      "participant": "peeringdb",
+      "from": 300,
+      "to": 351,
+      "type": "cloud"
+    },
+    {
+      "participant": "cache",
+      "from": 403,
+      "to": 418,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Two paths, one answer",
+      "items": [
+        "A cache hit returns at the second message",
+        "A miss is the only thing that reaches the internet",
+        "The agent cannot tell the difference, beyond latency"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "The shaping is load-bearing",
+      "items": [
+        "Raw presence records can exceed 130 KB",
+        "Passing that through would flood the context window",
+        "A flooded agent is measurably worse at the actual task"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Nothing upstream is trusted",
+      "items": [
+        "Free-text fields are written by the networks themselves",
+        "They are allowlisted, length-capped and sanitised",
+        "Validation happens before the cache, not after"
+      ]
+    }
+  ]
+}

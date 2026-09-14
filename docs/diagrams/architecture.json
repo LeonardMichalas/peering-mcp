@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "How peering-mcp fits together",
+    "output": "../architecture.html",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "request-path",
+        "label": "The request path",
+        "focus": [
+          "agent",
+          "server",
+          "peeringdb"
+        ],
+        "note": "The agent asks the server; only the server ever reaches the public internet."
+      },
+      {
+        "id": "upstream",
+        "label": "Upstream sources",
+        "focus": [
+          "server",
+          "peeringdb",
+          "rdap"
+        ],
+        "note": "Two public, free, read-only APIs. No scraping and no credentials required."
+      },
+      {
+        "id": "cache",
+        "label": "Staying polite",
+        "focus": [
+          "server",
+          "cache",
+          "peeringdb"
+        ],
+        "note": "The disk cache is what keeps the server inside PeeringDB's one-request-per-second budget."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "agent",
+      "type": "external",
+      "label": "AI agent",
+      "sublabel": "Claude Code, Codex, Cursor",
+      "pos": [
+        60,
+        170
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "peering-mcp",
+      "sublabel": "MCP server",
+      "tag": "rate limit + validate + shape",
+      "pos": [
+        420,
+        166
+      ],
+      "size": [
+        170,
+        80
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Disk cache",
+      "sublabel": "24 h by default",
+      "pos": [
+        425,
+        350
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "peeringdb",
+      "type": "cloud",
+      "label": "PeeringDB",
+      "sublabel": "API v2",
+      "tag": "1 request/second",
+      "pos": [
+        810,
+        70
+      ],
+      "size": [
+        170,
+        72
+      ]
+    },
+    {
+      "id": "rdap",
+      "type": "cloud",
+      "label": "RDAP",
+      "sublabel": "registry data",
+      "pos": [
+        810,
+        270
+      ],
+      "size": [
+        170,
+        72
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Your machine",
+      "wraps": [
+        "agent",
+        "server",
+        "cache"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Public APIs",
+      "wraps": [
+        "peeringdb",
+        "rdap"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "read-only: GET only, upstream text sanitised",
+      "wraps": [
+        "server"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "agent-to-server",
+      "from": "agent",
+      "to": "server",
+      "label": "stdio",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "server-cache",
+      "from": "server",
+      "to": "cache",
+      "label": "read, then store",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 72
+    },
+    {
+      "id": "server-peeringdb",
+      "from": "server",
+      "to": "peeringdb",
+      "label": "HTTPS GET",
+      "variant": "emphasis",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "server-rdap",
+      "from": "server",
+      "to": "rdap",
+      "label": "HTTPS GET",
+      "fromSide": "right",
+      "toSide": "left"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One way out",
+      "items": [
+        "The agent never reaches the internet itself",
+        "Every upstream call leaves from the server",
+        "Rate limiting and caching can only be enforced here"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Small on purpose",
+      "items": [
+        "One raw record can exceed 130 KB",
+        "Every tool returns a shaped, compact result",
+        "Each answer carries its source and its age"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Read-only, permanently",
+      "items": [
+        "Only GET is ever sent, enforced at the transport",
+        "Upstream free text is allowlisted and length-capped",
+        "There is no write path and there will not be one"
+      ]
+    }
+  ]
+}
