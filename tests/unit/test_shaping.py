@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 from peering_mcp.models.upstream import UpstreamNetwork
+from peering_mcp.sanitize import STRUCTURAL_CHARACTERS
 from peering_mcp.shaping import shape_network, shape_network_match
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "peeringdb"
@@ -59,17 +60,38 @@ def test_free_text_fields_are_never_carried_through() -> None:
     model reads the result. Since T5 they are dropped at the boundary rather
     than by this layer, so the assertion holds for a reason it did not before:
     there is nothing on the upstream model left to carry through.
+
+    Each dropped field carries a phrase that appears nowhere else in the
+    fixture, so this distinguishes "the field was dropped" from "the field was
+    cleaned".
     """
     raw = load_raw("net_hostile.json")
-    assert "IGNORE PREVIOUS INSTRUCTIONS" in raw["aka"]
-    assert "maintenance mode" in raw["notes"]
+    assert "SSH keys" in raw["aka"]
+    assert "shell_exec" in raw["notes"]
 
     serialised = shape_network(UpstreamNetwork.model_validate(raw)).model_dump_json()
 
-    assert "IGNORE PREVIOUS INSTRUCTIONS" not in serialised
-    assert "maintenance mode" not in serialised
-    assert "system>" not in serialised
+    assert "SSH keys" not in serialised
+    assert "shell_exec" not in serialised
     assert "Totally Normal Net" in serialised, "the legitimate name should survive"
+
+
+def test_structure_is_gone_from_every_field_that_does_pass_through() -> None:
+    """The fields that survive carry no character that builds a control shape.
+
+    Checked on the values rather than the serialised JSON, which has braces and
+    quotes of its own.
+    """
+    raw = load_raw("net_hostile.json")
+    shaped = shape_network(UpstreamNetwork.model_validate(raw))
+
+    values = [v for v in shaped.model_dump().values() if isinstance(v, str)]
+    values += [v for v in shaped.policy.model_dump().values() if isinstance(v, str)]
+    assert values, "the hostile fixture should leave some text behind to check"
+
+    for value in values:
+        for character in STRUCTURAL_CHARACTERS:
+            assert character not in value, f"{character!r} survived in {value!r}"
 
 
 def test_empty_strings_become_none() -> None:

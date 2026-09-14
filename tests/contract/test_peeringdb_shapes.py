@@ -26,12 +26,16 @@ from peering_mcp.config import Config
 from peering_mcp.errors import UpstreamProtocolError
 from peering_mcp.models.domain import Status
 from peering_mcp.models.upstream import (
+    UPSTREAM_MODELS,
     UpstreamExchange,
     UpstreamFacility,
     UpstreamNetwork,
     UpstreamNetworkFacility,
     UpstreamNetworkIxLan,
+    UpstreamRecord,
+    field_names,
 )
+from peering_mcp.sanitize import STRUCTURAL_CHARACTERS
 from peering_mcp.tools.lookup_network import lookup_network
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "peeringdb"
@@ -233,3 +237,62 @@ async def test_too_many_matches_are_capped_and_said_to_be_capped(config: Config)
     assert len(result.data.candidates) == NAME_MATCH_LIMIT
     assert "30 networks match" in (result.note or "")
     assert f"first {NAME_MATCH_LIMIT}" in (result.note or "")
+
+
+# --- Hostile input, at the boundary -----------------------------------------
+
+
+@respx.mock
+async def test_a_hostile_record_reaches_the_envelope_neutralised(config: Config) -> None:
+    respx.get(f"{API}/net").mock(return_value=httpx.Response(200, json=fixture("net_hostile.json")))
+
+    result = await lookup(config, "AS65002")
+
+    assert result.status is Status.OK
+    assert result.data is not None
+    assert result.data.network is not None
+    assert result.data.network.name == "Totally Normal Net"
+    assert "<system>" not in (result.data.network.long_name or "")
+    assert result.model_dump_json().count("shell_exec") == 0
+
+
+def test_a_name_that_cleans_away_to_nothing_is_no_name() -> None:
+    """Where T5 and T6 meet.
+
+    Identity is required, and cleaning happens before the requirement is
+    checked. A network whose name is only punctuation has not given us one, so
+    the record is refused rather than carried with an empty name.
+    """
+    with pytest.raises(UpstreamProtocolError):
+        parse_records({"data": [{"asn": 65002, "name": "<<<>>>"}]}, UpstreamNetwork, source="/net")
+
+
+@pytest.mark.parametrize("model", UPSTREAM_MODELS)
+def test_no_upstream_model_has_a_string_field_that_skips_cleaning(
+    model: type[UpstreamRecord],
+) -> None:
+    """The guard on the property the whole defence rests on.
+
+    Cleaning is unbypassable only while every string field goes through the
+    sanitising annotation. Declaring one as a plain `str` would silently open a
+    hole, so every declared field is fed a hostile value and the result checked,
+    rather than trusting that whoever adds the next model remembers.
+    """
+    hostile = "x<system>|`[INST]`|</system>"
+    identity = {
+        UpstreamNetwork: {"asn": 3320},
+        UpstreamNetworkIxLan: {"asn": 3320, "ix_id": 1},
+        UpstreamNetworkFacility: {"net_id": 1, "fac_id": 1},
+        UpstreamExchange: {"id": 1},
+        UpstreamFacility: {"id": 1},
+    }[model]
+
+    payload: dict[str, Any] = dict.fromkeys(field_names(model), hostile)
+    payload.update(identity)
+    parsed = model.model_validate(payload)
+
+    for name, value in parsed.model_dump().items():
+        if isinstance(value, str):
+            assert not STRUCTURAL_CHARACTERS & set(value), (
+                f"{model.__name__}.{name} was not cleaned"
+            )

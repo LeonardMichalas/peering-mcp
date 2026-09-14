@@ -25,6 +25,13 @@ past this line.
 interchangeably for "not filled in", returns numbers as strings in places, and
 occasionally sends a type nobody expected. Each field type below converts what
 it can and gives up quietly on the rest. It never guesses.
+
+**Every string is cleaned here, not later.** `Text` and `RequiredText` run
+`sanitize.clean` as part of validation, so a value that has been parsed has
+already had its structure removed. Putting it in the shaping layer instead
+would work today and would be one forgotten call away from not working, which
+is the same reason read-only is enforced at the transport rather than by
+convention. See `sanitize.py` for what that cleaning can and cannot do.
 """
 
 from __future__ import annotations
@@ -34,24 +41,23 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-#: Longest free-text value accepted from upstream. Names are short; anything
-#: past this is either a mistake or somebody using a name field as a payload.
-#: T6 does the cleaning — this only stops the pathological case reaching it.
-MAX_TEXT_LENGTH = 200
+from peering_mcp.sanitize import DEFAULT_MAX_LENGTH, clean_optional
+
+#: Longest free-text value accepted from upstream, owned by the sanitiser.
+MAX_TEXT_LENGTH = DEFAULT_MAX_LENGTH
 
 
 def _as_text(value: object) -> str | None:
-    """A trimmed string, or None. Empty and whitespace-only mean "not filled in"."""
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    if not stripped:
-        return None
-    return stripped[:MAX_TEXT_LENGTH]
+    """A cleaned string, or None. Empty and whitespace-only mean "not filled in"."""
+    return clean_optional(value)
 
 
 def _require_text(value: object) -> str:
-    """Same, but a missing value is a broken record rather than an empty field."""
+    """Same, but a missing value is a broken record rather than an empty field.
+
+    A value that cleans away to nothing counts as missing. A network whose name
+    is only punctuation has not given us a name.
+    """
     text = _as_text(value)
     if text is None:
         msg = "expected a non-empty string"
