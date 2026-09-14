@@ -1,8 +1,15 @@
 # peering-mcp
 
+[![CI](https://github.com/LeonardMichalas/peering-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardMichalas/peering-mcp/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/downloads/)
+[![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2.svg)](https://modelcontextprotocol.io)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy: strict](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](LICENSE)
+
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** `lookup_network` works against live data. The other four tools are next. Nothing is published to PyPI yet.
+> **Status: early development.** One of the five tools, `lookup_network`, works against live data, and the foundations under it are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other four tools are next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -30,7 +37,7 @@ It also returns how many locations each network has on its own, so an empty answ
 
 ### What a result looks like
 
-Asking `lookup_network` for `AS3320` returns 854 bytes, not the 42-field upstream record:
+Asking `lookup_network` for `AS3320` returns this — the whole response, 854 bytes on the wire, against a 42-field upstream record:
 
 ```json
 {
@@ -39,21 +46,34 @@ Asking `lookup_network` for `AS3320` returns 854 bytes, not the 42-field upstrea
     "network": {
       "asn": 3320,
       "name": "Deutsche Telekom",
+      "long_name": "Deutsche Telekom AG",
+      "website": "https://wholesale.telekom.com",
       "network_type": "NSP",
+      "traffic_estimate": "50-100Tbps",
       "scope": "Global",
+      "traffic_ratio": "Mostly Inbound",
+      "ipv4_prefixes": 150000,
+      "ipv6_prefixes": 40000,
       "exchange_count": 7,
       "facility_count": 53,
       "policy": {
         "general": "Restrictive",
+        "locations": "Required - International",
+        "ratio_required": true,
         "contract_required": "Required",
-        "ratio_required": true
-      }
-    }
+        "url": null
+      },
+      "irr_as_set": "AS3320:AS-DTAG AS3320:AS-DTAG-V6",
+      "looking_glass": "https://lg.telekom.com"
+    },
+    "candidates": []
   },
   "note": "PeeringDB records are maintained by the networks themselves. Treat a missing field as unrecorded, not as evidence it is untrue.",
   "provenance": {
     "source": "peeringdb",
-    "record_updated": "2026-08-31T13:30:19Z"
+    "fetched_at": "2026-09-14T16:44:53.916085Z",
+    "record_updated": "2026-08-31T13:30:19Z",
+    "from_cache": false
   }
 }
 ```
@@ -167,20 +187,16 @@ Everything has a working default. The server starts and answers questions with n
 
 ### Tests
 
-Four levels, each answering a different question:
+Each level answers a different question:
 
-| Directory | Answers |
-| --- | --- |
-| `tests/unit/` | Is the pure logic right? |
-| `tests/contract/` | Does the server handle what upstream actually sends, including malformed and hostile responses? |
-| `tests/integration/` | Does it behave as an MCP server? |
-| `tests/eval/` | Does a model pick the right tool from its description? |
+| Directory | Answers | |
+| --- | --- | --- |
+| `tests/unit/` | Is the pure logic right? | ✅ |
+| `tests/contract/` | Does the server handle what upstream actually sends, including malformed and hostile responses? | ✅ |
+| `tests/integration/` | Does it behave as an MCP server? | ✅ |
+| `tests/eval/` | Does a model pick the right tool from its description? | planned |
 
-Tests marked `live` hit the real API and are opt-in, never run in CI:
-
-```bash
-uv run pytest -m live
-```
+**No test reaches the real API.** Upstream is mocked at the transport, so the suite runs offline and gives the same answer everywhere. The `live` marker is reserved for opt-in tests that do hit PeeringDB; CI excludes it with `-m "not live"`.
 
 ## Contributing
 
