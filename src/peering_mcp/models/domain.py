@@ -16,11 +16,21 @@ from pydantic import BaseModel, Field
 
 
 class Status(StrEnum):
-    """How a tool call turned out."""
+    """How a tool call turned out.
+
+    `OK` carries one promise: the answer is in `data` and the caller can use it
+    without checking anything else. Every other member exists because some
+    result would otherwise have to be smuggled through `OK` with an empty
+    payload, and a status nobody can trust is worse than no status at all.
+    """
 
     OK = "ok"
     #: The thing genuinely does not exist upstream.
     NOT_FOUND = "not_found"
+    #: The query matched several things and guessing between them would be
+    #: worse than asking. Candidates are in `data`; the caller picks one and
+    #: calls again.
+    AMBIGUOUS = "ambiguous"
     #: It exists, but this field or relationship is not populated. Absence in a
     #: self-reported registry is not evidence of absence in reality.
     NOT_RECORDED = "not_recorded"
@@ -110,15 +120,18 @@ class NetworkLookup(BaseModel):
     """The payload of `lookup_network`.
 
     Either one network resolved, or several candidates to choose between. One
-    shape covers both, so the caller never has to branch on which it got.
+    shape covers both; which one it is, is told by the envelope's status, so
+    the caller branches on `status` and never has to probe the payload to find
+    out what it got.
     """
 
     network: Network | None = Field(
-        default=None, description="Set when the query resolved to exactly one network."
+        default=None, description="Set when status is ok: the query resolved to one network."
     )
     candidates: list[NetworkMatch] = Field(
         default_factory=list,
-        description="Set when a name matched several networks. Call again with one of these ASNs.",
+        description="Set when status is ambiguous: a name matched several networks. "
+        "Call again with one of these ASNs.",
     )
 
 

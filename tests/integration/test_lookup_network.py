@@ -61,6 +61,7 @@ async def test_description_tells_the_model_when_not_to_use_it() -> None:
     assert "Do not use this" in description
     assert "find_common_presence" in description
     assert "not_found" in description
+    assert "ambiguous" in description, "a status the model can get must be documented"
 
 
 # --- The happy paths -------------------------------------------------------
@@ -121,11 +122,41 @@ async def test_ambiguous_name_returns_candidates_not_a_guess() -> None:
 
     payload = await call("Hurricane")
 
-    assert payload["status"] == Status.OK
+    assert payload["status"] == Status.AMBIGUOUS
     assert payload["data"]["network"] is None, "an ambiguous name must not resolve to a guess"
     asns = [c["asn"] for c in payload["data"]["candidates"]]
     assert 6939 in asns
     assert "call this tool again" in (payload["note"] or "")
+
+
+@respx.mock
+async def test_ambiguous_is_not_ok() -> None:
+    """The invariant the whole envelope rests on: `ok` means there is an answer.
+
+    A caller that branches on status must be able to trust it without also
+    inspecting the payload. If `ambiguous` were reported as `ok`, a model
+    would read the status, reach for `data.network`, and find nothing there.
+    """
+    respx.get(f"{API}/net").mock(
+        return_value=httpx.Response(200, json=fixture("net_name_hurricane.json"))
+    )
+
+    payload = await call("Hurricane")
+
+    assert payload["status"] != Status.OK
+
+
+@respx.mock
+async def test_ambiguous_still_says_where_the_candidates_came_from() -> None:
+    """It is a real upstream answer, so it carries provenance like any other."""
+    respx.get(f"{API}/net").mock(
+        return_value=httpx.Response(200, json=fixture("net_name_hurricane.json"))
+    )
+
+    payload = await call("Hurricane")
+
+    assert payload["provenance"] is not None
+    assert payload["provenance"]["source"] == "peeringdb"
 
 
 @respx.mock
@@ -135,6 +166,7 @@ async def test_name_matching_one_network_resolves_directly() -> None:
 
     payload = await call("Hurricane Electric")
 
+    assert payload["status"] == Status.OK, "one match is an answer, not an ambiguity"
     assert payload["data"]["network"]["asn"] == 6939
     assert payload["data"]["candidates"] == []
 

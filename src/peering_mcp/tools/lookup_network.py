@@ -193,7 +193,7 @@ async def _by_name(client: PeeringDBClient, fragment: str) -> ToolResult[Network
     if len(records) > NAME_MATCH_LIMIT:
         note += f" Showing the first {NAME_MATCH_LIMIT}."
     return ToolResult(
-        status=Status.OK,
+        status=Status.AMBIGUOUS,
         data=NetworkLookup(candidates=candidates),
         note=note,
         provenance=Provenance.now("peeringdb"),

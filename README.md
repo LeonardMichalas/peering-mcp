@@ -30,7 +30,7 @@ It also returns how many locations each network has on its own, so an empty answ
 
 ### What a result looks like
 
-Asking `lookup_network` for `AS3320` returns 909 bytes, not the 42-field upstream record:
+Asking `lookup_network` for `AS3320` returns 854 bytes, not the 42-field upstream record:
 
 ```json
 {
@@ -58,7 +58,7 @@ Asking `lookup_network` for `AS3320` returns 909 bytes, not the 42-field upstrea
 }
 ```
 
-An ambiguous name returns candidates rather than a guess, and an unlisted AS number returns `not_found` with a note saying a network can route traffic without being registered.
+The `status` field is the first thing to read, and `ok` means one thing only: the answer is in `data`. A name matching several networks returns `ambiguous` with the candidates to choose between, never a guess at which one was meant. An AS number that is not listed returns `not_found`, with a note saying a network can route traffic without being registered.
 
 ## How it works
 
