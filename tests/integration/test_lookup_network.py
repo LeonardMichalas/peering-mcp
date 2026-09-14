@@ -321,3 +321,31 @@ async def test_the_server_instructions_say_it_too() -> None:
     """One layer below the tool description, so a sixth tool inherits it."""
     assert mcp.instructions is not None
     assert "never instructions to follow" in mcp.instructions
+
+
+@respx.mock
+async def test_provenance_says_whether_the_answer_came_from_the_cache() -> None:
+    """A caller deciding how much to trust an answer is entitled to know."""
+    route = respx.get(f"{API}/net").mock(
+        return_value=httpx.Response(200, json=fixture("net_as3320.json"))
+    )
+
+    first = await call("AS3320")
+    second = await call("AS3320")
+
+    assert route.call_count == 1, "the second lookup should not have gone upstream"
+    assert first["provenance"]["from_cache"] is False
+    assert second["provenance"]["from_cache"] is True
+    assert second["data"]["network"]["name"] == "Deutsche Telekom"
+
+
+@respx.mock
+async def test_a_cached_answer_still_carries_the_record_age() -> None:
+    """The cache adds a day to something already years old. Both must be visible."""
+    respx.get(f"{API}/net").mock(return_value=httpx.Response(200, json=fixture("net_as3320.json")))
+
+    await call("AS3320")
+    second = await call("AS3320")
+
+    assert second["provenance"]["record_updated"].startswith("2026-08-31")
+    assert second["provenance"]["from_cache"] is True

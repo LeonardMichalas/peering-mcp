@@ -43,9 +43,10 @@ async def core(config: Config):
 async def test_returns_decoded_json(core: HttpCore) -> None:
     respx.get(f"{BASE}/net").mock(return_value=httpx.Response(200, json={"data": [{"asn": 3320}]}))
 
-    payload = await core.get_json("/net", params={"asn": 3320})
+    fetched = await core.get_json("/net", params={"asn": 3320})
 
-    assert payload == {"data": [{"asn": 3320}]}
+    assert fetched.value == {"data": [{"asn": 3320}]}
+    assert fetched.from_cache is False, "the first call cannot be a cache hit"
 
 
 @respx.mock
@@ -167,9 +168,9 @@ async def test_transient_500_then_success(config: Config) -> None:
     )
 
     async with HttpCore(retrying, base_url=BASE) as client:
-        payload = await client.get_json("/net")
+        fetched = await client.get_json("/net")
 
-    assert payload == {"data": []}
+    assert fetched.value == {"data": []}
     assert route.call_count == 2
 
 

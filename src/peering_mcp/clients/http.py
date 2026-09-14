@@ -8,17 +8,24 @@ rather than left to callers, because a caller can forget:
 * Requests to a rate-limited upstream pass through a limiter first.
 * Transient failures are retried with backoff, and a permanent failure becomes
   a typed exception rather than a raw status code.
+* A cached response is served without touching the network.
+
+**The cache sits in front of the limiter, not behind it.** A hit must not spend
+a rate-limit token, because the token is the scarce thing: at one request per
+second, a cache that still queued would save latency and nothing else.
 """
 
 from __future__ import annotations
 
 import asyncio
 import random
+from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Self
 
 import httpx
 
+from peering_mcp.clients.cache import Cache, build_cache, cache_key
 from peering_mcp.clients.rate_limit import RateLimiter
 from peering_mcp.config import Config
 from peering_mcp.errors import (
@@ -36,6 +43,23 @@ _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 _MAX_BACKOFF_SECONDS = 8.0
 #: Never honour an absurd Retry-After; a minute of silence looks like a hang.
 _MAX_RETRY_AFTER_SECONDS = 30.0
+
+
+@dataclass(frozen=True, slots=True)
+class Fetched[T]:
+    """A value, and whether it came from the cache rather than the network.
+
+    Carried all the way to the envelope's provenance. A caller deciding how
+    much to trust an answer is entitled to know it may be up to a TTL old, on
+    top of however stale the upstream record already was.
+    """
+
+    value: T
+    from_cache: bool
+
+    def with_value[U](self, value: U) -> Fetched[U]:
+        """The same provenance, wrapped around something derived from it."""
+        return Fetched(value=value, from_cache=self.from_cache)
 
 
 class GetOnlyTransport(httpx.AsyncBaseTransport):
@@ -88,9 +112,16 @@ class HttpCore:
         limiter: RateLimiter | None = None,
         headers: dict[str, str] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        cache: Cache | None = None,
     ) -> None:
         self._config = config
         self._limiter = limiter
+        self._base_url = base_url
+        self._cache = cache or build_cache(
+            enabled=config.cache_enabled,
+            ttl_seconds=config.cache_ttl_seconds,
+            directory=config.cache_dir,
+        )
         base_headers = {"User-Agent": config.user_agent, "Accept": "application/json"}
         if headers:
             base_headers.update(headers)
@@ -115,11 +146,17 @@ class HttpCore:
 
     async def aclose(self) -> None:
         await self._client.aclose()
+        self._cache.close()
 
     async def get_json(
         self, path: str, params: dict[str, str | int] | None = None
-    ) -> dict[str, Any]:
+    ) -> Fetched[dict[str, Any]]:
         """GET a path and return the decoded JSON object.
+
+        A cached response is returned without contacting upstream and without
+        spending a rate-limit token. Only successful responses are ever stored:
+        a failure is not an answer, and remembering one would turn a passing
+        problem into a lasting one.
 
         Raises:
             UpstreamNotFoundError: upstream said the resource does not exist.
@@ -127,6 +164,11 @@ class HttpCore:
             UpstreamUnavailableError: upstream failed, timed out or was unreachable.
             UpstreamProtocolError: the body was not a JSON object.
         """
+        key = cache_key(self._base_url, path, params)
+        cached = await asyncio.to_thread(self._cache.get, key)
+        if cached is not None:
+            return Fetched(value=cached, from_cache=True)
+
         response = await self._get_with_retries(path, params)
 
         if response.status_code == httpx.codes.NOT_FOUND:
@@ -145,7 +187,9 @@ class HttpCore:
             raise UpstreamProtocolError(
                 f"{path} returned {type(payload).__name__}, expected a JSON object"
             )
-        return payload
+
+        await asyncio.to_thread(self._cache.set, key, payload)
+        return Fetched(value=payload, from_cache=False)
 
     async def _get_with_retries(
         self, path: str, params: dict[str, str | int] | None

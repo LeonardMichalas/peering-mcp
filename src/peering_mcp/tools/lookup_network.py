@@ -85,7 +85,8 @@ async def lookup_network(client: PeeringDBClient, query: str) -> ToolResult[Netw
 
 
 async def _by_asn(client: PeeringDBClient, asn: int) -> ToolResult[NetworkLookup]:
-    record = await client.network_by_asn(asn)
+    fetched = await client.network_by_asn(asn)
+    record = fetched.value
     if record is None:
         return ToolResult(
             status=Status.NOT_FOUND,
@@ -96,12 +97,15 @@ async def _by_asn(client: PeeringDBClient, asn: int) -> ToolResult[NetworkLookup
         status=Status.OK,
         data=NetworkLookup(network=shape_network(record)),
         note=_SELF_REPORTED,
-        provenance=Provenance.now("peeringdb", record_updated=record.updated),
+        provenance=Provenance.now(
+            "peeringdb", record_updated=record.updated, from_cache=fetched.from_cache
+        ),
     )
 
 
 async def _by_name(client: PeeringDBClient, fragment: str) -> ToolResult[NetworkLookup]:
-    records = await client.networks_by_name(fragment)
+    fetched = await client.networks_by_name(fragment)
+    records = fetched.value
     if not records:
         return ToolResult(
             status=Status.NOT_FOUND,
@@ -115,7 +119,9 @@ async def _by_name(client: PeeringDBClient, fragment: str) -> ToolResult[Network
             status=Status.OK,
             data=NetworkLookup(network=shape_network(record)),
             note=_SELF_REPORTED,
-            provenance=Provenance.now("peeringdb", record_updated=record.updated),
+            provenance=Provenance.now(
+                "peeringdb", record_updated=record.updated, from_cache=fetched.from_cache
+            ),
         )
 
     candidates = [shape_network_match(row) for row in records[:NAME_MATCH_LIMIT]]
@@ -129,5 +135,5 @@ async def _by_name(client: PeeringDBClient, fragment: str) -> ToolResult[Network
         status=Status.AMBIGUOUS,
         data=NetworkLookup(candidates=candidates),
         note=note,
-        provenance=Provenance.now("peeringdb"),
+        provenance=Provenance.now("peeringdb", from_cache=fetched.from_cache),
     )

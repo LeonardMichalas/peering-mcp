@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from peering_mcp.clients import cache as cache_module
+
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
@@ -17,3 +19,20 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 def fixture_dir() -> Path:
     """Directory holding recorded upstream responses."""
     return FIXTURE_DIR
+
+
+@pytest.fixture(autouse=True)
+def isolated_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test may touch the developer's real cache directory.
+
+    Autouse and unconditional, because the default `Config` caches to
+    `~/.cache/peering-mcp` and a test that builds one without saying so would
+    otherwise write there — and read back what an earlier test wrote, which is
+    how a suite starts passing for reasons nobody chose. Caching stays on and
+    real; it is just per-test.
+
+    Found the hard way: wiring the cache in turned seventeen tests red at once,
+    all of them serving a previous test's response.
+    """
+    monkeypatch.setattr(cache_module, "default_cache_dir", lambda: tmp_path / "cache")
+    monkeypatch.setenv("PEERING_MCP_CACHE_DIR", str(tmp_path / "cache"))

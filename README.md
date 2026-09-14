@@ -191,7 +191,7 @@ Everything has a working default. The server starts and answers questions with n
 | --- | --- | --- |
 | `PEERINGDB_API_KEY` | unset | Raises the PeeringDB rate limit. Works without it |
 | `PEERING_MCP_CACHE_TTL` | `86400` | Cache lifetime in seconds |
-| `PEERING_MCP_CACHE_DIR` | platform cache dir | Where the on-disk cache lives |
+| `PEERING_MCP_CACHE_DIR` | `$XDG_CACHE_HOME/peering-mcp`, else `~/.cache/peering-mcp` | Where the on-disk cache lives |
 | `PEERING_MCP_NO_CACHE` | unset | Set to `1` to disable caching, for testing |
 | `PEERING_MCP_TIMEOUT` | `10` | Per-request timeout in seconds |
 | `PEERING_MCP_MAX_RETRIES` | `3` | Attempts before an upstream failure is reported |

@@ -16,7 +16,7 @@ from typing import Any, Self
 
 from pydantic import ValidationError
 
-from peering_mcp.clients.http import HttpCore
+from peering_mcp.clients.http import Fetched, HttpCore
 from peering_mcp.clients.rate_limit import RateLimiter
 from peering_mcp.config import Config
 from peering_mcp.errors import UpstreamProtocolError
@@ -62,21 +62,21 @@ class PeeringDBClient:
     async def aclose(self) -> None:
         await self._core.aclose()
 
-    async def network_by_asn(self, asn: int) -> UpstreamNetwork | None:
+    async def network_by_asn(self, asn: int) -> Fetched[UpstreamNetwork | None]:
         """Return the network record for an AS number, or None if unlisted.
 
         PeeringDB answers an unknown ASN with 404, which `HttpCore` turns into
         `UpstreamNotFoundError`; that is handled by the caller. An empty `data`
         array is the other way it says no, so both are collapsed to None here.
         """
-        payload = await self._core.get_json("/net", params={"asn": asn})
-        records = parse_records(payload, UpstreamNetwork, source="/net")
-        return records[0] if records else None
+        fetched = await self._core.get_json("/net", params={"asn": asn})
+        records = parse_records(fetched.value, UpstreamNetwork, source="/net")
+        return fetched.with_value(records[0] if records else None)
 
-    async def networks_by_name(self, fragment: str) -> list[UpstreamNetwork]:
+    async def networks_by_name(self, fragment: str) -> Fetched[list[UpstreamNetwork]]:
         """Return networks whose name contains `fragment`."""
-        payload = await self._core.get_json("/net", params={"name__contains": fragment})
-        return parse_records(payload, UpstreamNetwork, source="/net")
+        fetched = await self._core.get_json("/net", params={"name__contains": fragment})
+        return fetched.with_value(parse_records(fetched.value, UpstreamNetwork, source="/net"))
 
 
 def parse_records[T: UpstreamRecord](
