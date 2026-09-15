@@ -117,7 +117,7 @@ All public, all free, no scraping.
 
 | Source | Used for | Auth | Cost |
 | --- | --- | --- | --- |
-| [PeeringDB API v2](https://www.peeringdb.com/apidocs/) | Networks, exchanges, facilities, presence, peering policy | API key optional | Free |
+| [PeeringDB API v2](https://www.peeringdb.com/apidocs/) | Networks, exchanges, facilities, presence, peering policy | API key recommended, not required | Free |
 | [RDAP](https://about.rdap.org/) | Registration data for IPs, prefixes and AS numbers | None | Free |
 
 Later versions may add observed routing data from [RIPEstat](https://stat.ripe.net) and topology from [CAIDA AS Rank](https://asrank.caida.org).
@@ -126,7 +126,7 @@ Later versions may add observed routing data from [RIPEstat](https://stat.ripe.n
 
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
-- Optionally a free [PeeringDB API key](https://docs.peeringdb.com/howto/api_keys/), which raises the rate limit
+- A free [PeeringDB API key](https://docs.peeringdb.com/howto/api_keys/) is recommended but not required — see [below](#a-peeringdb-api-key)
 
 ## Use it with an agent
 
@@ -152,6 +152,35 @@ claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mc
 ```
 
 Then ask it something an agent normally gets wrong: *"Where could Deutsche Telekom and Hurricane Electric peer with each other?"*
+
+### A PeeringDB API key
+
+**Recommended, and not required.** Every tool works without one, nothing is gated, and the server starts with no configuration at all.
+
+The reason to add one is that PeeringDB limits anonymous callers more tightly than authenticated ones, and its own throttle response says so: *"Authenticate for less restrictions."* The limit is easiest to reach on `/netixlan`, which is both the largest endpoint and the one every presence question needs — a network's raw port records run past 130 KB. Anonymous callers who cross the line get a throttle notice with a wait measured in tens of minutes. The server handles it honestly, returning `rate_limited` rather than a wrong or empty answer, but it cannot answer until the wait is over.
+
+A key is free and takes about a minute: [docs.peeringdb.com/howto/api_keys/](https://docs.peeringdb.com/howto/api_keys/). **Use your own** — it identifies your calls to PeeringDB and is tied to your account.
+
+Pass it as the `PEERINGDB_API_KEY` environment variable on the server process. Keeping it in the MCP client's own config scopes the secret to the one process that needs it:
+
+```bash
+claude mcp add peering-mcp -e PEERINGDB_API_KEY=your-key-here -- \
+  uv run --directory /path/to/peering-mcp peering-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "peering-mcp": {
+      "command": "uv",
+      "args": ["run", "--directory", "/path/to/peering-mcp", "peering-mcp"],
+      "env": { "PEERINGDB_API_KEY": "your-key-here" }
+    }
+  }
+}
+```
+
+The server reads the key from the environment only. It does not read a `.env` file, so a key placed in one is ignored without warning.
 
 ## Development
 
@@ -192,7 +221,7 @@ Everything has a working default. The server starts and answers questions with n
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `PEERINGDB_API_KEY` | unset | Raises the PeeringDB rate limit. Works without it |
+| `PEERINGDB_API_KEY` | unset | Raises the PeeringDB rate limit. Recommended, not required |
 | `PEERING_MCP_CACHE_TTL` | `86400` | Cache lifetime in seconds |
 | `PEERING_MCP_CACHE_DIR` | `$XDG_CACHE_HOME/peering-mcp`, else `~/.cache/peering-mcp` | Where the on-disk cache lives |
 | `PEERING_MCP_NO_CACHE` | unset | Set to `1` to disable caching, for testing |
