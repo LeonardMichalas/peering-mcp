@@ -35,3 +35,7 @@ coverage.xml
 .DS_Store
 .idea/
 .vscode/
+
+# Rendered diagrams. The JSON sources and the SVGs in docs/images/ are
+# what the repository carries; the HTML in between is a local intermediate.
+docs/*.html

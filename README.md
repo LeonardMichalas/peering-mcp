@@ -83,8 +83,8 @@ The `status` field is the first thing to read, and `ok` means one thing only: th
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.png">
-  <img alt="The agent talks to peering-mcp over stdio. Only the server reaches the public internet, sending HTTPS GET requests to PeeringDB and RDAP, and reading from and writing to a local disk cache." src="docs/images/architecture-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img alt="The agent talks to peering-mcp over stdio. Only the server reaches the public internet, sending HTTPS GET requests to PeeringDB and RDAP, and reading from and writing to a local disk cache." src="docs/images/architecture-light.svg">
 </picture>
 
 The agent never reaches the internet itself. Everything goes through the server, which is the only place rate limiting, caching, validation and sanitisation can actually be enforced.
@@ -92,8 +92,8 @@ The agent never reaches the internet itself. Everything goes through the server,
 A request takes one of two paths:
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/request-dark.png">
-  <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/request-dark.svg">
+  <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.svg">
 </picture>
 
 That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task.
@@ -171,6 +171,18 @@ Install the git hooks once, and lint, format and types run before every commit:
 ```bash
 uv run pre-commit install
 ```
+
+### Diagrams
+
+The two diagrams above are generated, not drawn. `docs/diagrams/*.json` are the sources, and the animated SVGs in `docs/images/` are what the README shows.
+
+`docs/diagrams/animate.mjs` turns a rendered diagram into the pair of SVGs. It needs a Chromium-family browser on `PATH`:
+
+```bash
+node docs/diagrams/animate.mjs <rendered.html> docs/images/<name>
+```
+
+It emits one file per theme, because an SVG loaded as an image cannot see the theme of the page it lands in, and the motion is SMIL so that it survives GitHub rendering it as a bare image.
 
 ### Configuration
 
