@@ -296,3 +296,42 @@ def test_no_upstream_model_has_a_string_field_that_skips_cleaning(
             assert not STRUCTURAL_CHARACTERS & set(value), (
                 f"{model.__name__}.{name} was not cleaned"
             )
+
+
+# --- The batched queries the intersection is built on ------------------------
+
+
+@respx.mock
+async def test_a_batch_query_asks_for_a_sorted_de_duplicated_set(config: Config) -> None:
+    """Same networks, same query string, same cache key — whatever order they arrive in."""
+    route = respx.get(f"{API}/netixlan").mock(
+        return_value=httpx.Response(200, json={"data": [], "meta": {}})
+    )
+
+    async with PeeringDBClient(config) as client:
+        await client.exchange_presence_for_asns([6939, 3320, 6939])
+
+    assert route.calls.last.request.url.params["asn__in"] == "3320,6939"
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("networks_by_asns", "/net"),
+        ("exchange_presence_for_asns", "/netixlan"),
+        ("facility_presence_for_net_ids", "/netfac"),
+        ("exchanges_by_id", "/ix"),
+    ],
+)
+async def test_an_empty_batch_asks_upstream_nothing(config: Config, method: str, path: str) -> None:
+    """A rate-limit token spent to learn that nothing was asked for is a token wasted."""
+    route = respx.get(f"{API}{path}").mock(
+        return_value=httpx.Response(200, json={"data": [], "meta": {}})
+    )
+
+    async with PeeringDBClient(config) as client:
+        fetched = await getattr(client, method)([])
+
+    assert fetched.value == []
+    assert not route.called

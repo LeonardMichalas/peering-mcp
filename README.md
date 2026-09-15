@@ -9,7 +9,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** Two of the five tools, `lookup_network` and `list_presence`, work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other three tools are next. Nothing is published to PyPI yet.
+> **Status: early development.** Three of the five tools, `lookup_network`, `list_presence` and `find_common_presence`, work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other two tools are next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -28,10 +28,12 @@ This server is that way to check.
 | `lookup_network` | Who is this network, and what is their peering policy? | ✅ |
 | `list_presence` | Which internet exchanges and facilities are they present at? | ✅ |
 | `find_at_exchange` | Who else is at this exchange, and would they peer? | planned |
-| `find_common_presence` | **Where can these networks meet each other?** | planned |
+| `find_common_presence` | **Where can these networks meet each other?** | ✅ |
 | `lookup_registration` | Who is this IP range or AS number registered to? | planned |
 
 `find_common_presence` is the tool that motivated the project. Working out where two or more networks could interconnect means looking each one up, listing everywhere it is present, and intersecting the results by hand. That is about an hour and a dozen browser tabs. It should be one question.
+
+It takes two to five AS numbers and answers in four requests, whatever the number of networks. Shared exchanges come back widest bottleneck first — ordered by the smallest capacity any one network has there, because that is what a connection between them would be limited by.
 
 It also returns how many locations each network has on its own, so an empty answer is explainable: either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
 
@@ -96,7 +98,7 @@ A request takes one of two paths:
   <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.svg">
 </picture>
 
-That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of 50 exchanges, largest capacity first, in about 6 KB, and says how many it left out.
+That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of 50 exchanges, largest capacity first, in about 6 KB, and says how many it left out. `find_common_presence` reads 225 KB across three networks and answers in under 4 KB.
 
 ## Design principles
 
@@ -149,7 +151,7 @@ claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mc
 }
 ```
 
-Then ask it something an agent normally gets wrong: *"What is Deutsche Telekom's peering policy, and which internet exchanges are they at?"*
+Then ask it something an agent normally gets wrong: *"Where could Deutsche Telekom and Hurricane Electric peer with each other?"*
 
 ## Development
 

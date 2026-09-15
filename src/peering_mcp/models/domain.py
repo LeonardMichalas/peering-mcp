@@ -187,6 +187,58 @@ class PresenceList(BaseModel):
     )
 
 
+class ParticipantPorts(BaseModel):
+    """One network's ports at a location every network in the query is present at."""
+
+    asn: int
+    speed_mbps: int | None = Field(
+        default=None, description="This network's total port capacity here, in Mbps."
+    )
+    ports: int = Field(description="How many separate ports this network records here.")
+    route_server: bool | None = Field(
+        default=None, description="Whether they peer with the exchange's route server."
+    )
+
+
+class SharedExchange(BaseModel):
+    """An internet exchange every network in the query records a presence at."""
+
+    name: str
+    city: str | None = None
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+    networks: list[ParticipantPorts] = Field(
+        description="One entry per AS number asked about, in the order asked."
+    )
+
+
+class PresenceTotals(BaseModel):
+    """How much presence one network records in all.
+
+    Travels beside the shared lists so an empty overlap can be explained
+    rather than merely reported: two networks at 300 places each that share
+    nothing is a different fact from one of them recording nothing at all.
+    """
+
+    asn: int
+    name: str
+    exchanges: int = Field(description="Exchanges this network records, shared or not.")
+    facilities: int = Field(description="Facilities this network records, shared or not.")
+
+
+class CommonPresence(BaseModel):
+    """The payload of `find_common_presence`."""
+
+    networks: list[PresenceTotals] = Field(
+        description="One entry per AS number asked about, in the order asked."
+    )
+    exchanges: Page[SharedExchange] = Field(
+        description="Exchanges all of them are present at, largest shared capacity first."
+    )
+    facilities: Page[FacilityPresence] = Field(
+        description="Facilities all of them are present in, ordered by country then city."
+    )
+
+
 class ToolResult[T](BaseModel):
     """The envelope every tool returns."""
 

@@ -85,6 +85,22 @@ class PeeringDBClient:
         fetched = await self._core.get_json("/net", params={"name__contains": fragment})
         return fetched.with_value(parse_records(fetched.value, UpstreamNetwork, source="/net"))
 
+    async def networks_by_asns(self, asns: Iterable[int]) -> Fetched[list[UpstreamNetwork]]:
+        """Return the network records for several AS numbers, in one request.
+
+        The batch form of `network_by_asn`. An AS number nobody has listed is
+        simply absent from the result, so the caller compares what came back
+        with what it asked for; only a query where *every* ASN is unknown comes
+        back as a 404.
+        """
+        wanted, joined = _in_filter(asns)
+        if not wanted:
+            return Fetched(value=[], from_cache=True)
+        fetched = await self._core.get_json("/net", params={"asn__in": joined})
+        rows = parse_records(fetched.value, UpstreamNetwork, source="/net")
+        _require_filter_applied("/net", "asn__in", {row.asn for row in rows}, wanted)
+        return fetched.with_value(rows)
+
     async def exchange_presence(self, asn: int) -> Fetched[list[UpstreamNetworkIxLan]]:
         """Return every exchange port a network records, one row per port.
 
@@ -110,20 +126,63 @@ class PeeringDBClient:
         _require_filter_applied("/netfac", "net_id", {row.net_id for row in rows}, {net_id})
         return fetched.with_value(rows)
 
+    async def exchange_presence_for_asns(
+        self, asns: Iterable[int]
+    ) -> Fetched[list[UpstreamNetworkIxLan]]:
+        """Every exchange port several networks record, in one request.
+
+        `asn__in` is what makes `find_common_presence` a single query instead
+        of one per network. Verified against the live API before the tool that
+        depends on it was written.
+        """
+        wanted, joined = _in_filter(asns)
+        if not wanted:
+            return Fetched(value=[], from_cache=True)
+        fetched = await self._core.get_json("/netixlan", params={"asn__in": joined})
+        rows = parse_records(fetched.value, UpstreamNetworkIxLan, source="/netixlan")
+        _require_filter_applied("/netixlan", "asn__in", {row.asn for row in rows}, wanted)
+        return fetched.with_value(rows)
+
+    async def facility_presence_for_net_ids(
+        self, net_ids: Iterable[int]
+    ) -> Fetched[list[UpstreamNetworkFacility]]:
+        """Every facility several networks record, in one request.
+
+        Keyed by PeeringDB's network id for the same reason `facility_presence`
+        is: `/netfac` ignores an ASN filter and answers with all 61,855 rows.
+        """
+        wanted, joined = _in_filter(net_ids)
+        if not wanted:
+            return Fetched(value=[], from_cache=True)
+        fetched = await self._core.get_json("/netfac", params={"net_id__in": joined})
+        rows = parse_records(fetched.value, UpstreamNetworkFacility, source="/netfac")
+        _require_filter_applied("/netfac", "net_id__in", {row.net_id for row in rows}, wanted)
+        return fetched.with_value(rows)
+
     async def exchanges_by_id(self, ids: Iterable[int]) -> Fetched[list[UpstreamExchange]]:
         """Return the exchange records for a set of ids, in one request.
 
         Sorted and de-duplicated before building the query, so the same set
         always produces the same cache key.
         """
-        wanted = sorted(set(ids))
+        wanted, joined = _in_filter(ids)
         if not wanted:
             return Fetched(value=[], from_cache=True)
-        joined = ",".join(str(i) for i in wanted)
         fetched = await self._core.get_json("/ix", params={"id__in": joined})
         rows = parse_records(fetched.value, UpstreamExchange, source="/ix")
-        _require_filter_applied("/ix", "id__in", {row.record_id for row in rows}, set(wanted))
+        _require_filter_applied("/ix", "id__in", {row.record_id for row in rows}, wanted)
         return fetched.with_value(rows)
+
+
+def _in_filter(values: Iterable[int]) -> tuple[set[int], str]:
+    """The set a query asks for, and the `__in` value that asks for it.
+
+    Sorted and de-duplicated, so the same set of ids always produces the same
+    query string and therefore the same cache key. Two callers asking for the
+    same three networks in a different order must not fetch twice.
+    """
+    wanted = sorted(set(values))
+    return set(wanted), ",".join(str(value) for value in wanted)
 
 
 def _require_filter_applied(

@@ -16,7 +16,7 @@ never sees cannot be forgotten about. See `models/upstream.py`.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from peering_mcp.models.domain import (
@@ -24,7 +24,9 @@ from peering_mcp.models.domain import (
     FacilityPresence,
     Network,
     NetworkMatch,
+    ParticipantPorts,
     PeeringPolicy,
+    SharedExchange,
 )
 from peering_mcp.models.upstream import (
     UpstreamExchange,
@@ -80,6 +82,11 @@ class ExchangeGroup:
 
     ix_id: int
     ports: tuple[UpstreamNetworkIxLan, ...]
+
+    @property
+    def asn(self) -> int:
+        """Whose ports these are. Every row in a group belongs to one network."""
+        return self.ports[0].asn
 
     @property
     def speed_mbps(self) -> int | None:
@@ -166,3 +173,138 @@ def sort_facilities(rows: Iterable[UpstreamNetworkFacility]) -> list[UpstreamNet
         )
 
     return sorted(rows, key=key)
+
+
+# --- Shared presence --------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SharedExchangeGroup:
+    """One exchange, with every requested network's ports at it.
+
+    `per_network` runs in the order the caller asked, so an entry's position
+    is its network. Nothing is missing by construction: a group only exists
+    when every requested network has ports there.
+    """
+
+    ix_id: int
+    per_network: tuple[ExchangeGroup, ...]
+
+    @property
+    def bottleneck_mbps(self) -> int | None:
+        """The smallest capacity any one of them has here.
+
+        Not the sum. A shared connection is limited by the smaller side, so an
+        exchange where one network has a 10G port is a 10G meeting point
+        however many terabits the other brings. `None` when any network has
+        not said, because an unknown side is not a large one.
+        """
+        speeds: list[int] = []
+        for group in self.per_network:
+            if group.speed_mbps is None:
+                return None
+            speeds.append(group.speed_mbps)
+        return min(speeds) if speeds else None
+
+    @property
+    def fallback_name(self) -> str | None:
+        """The name any port row carries, for when the exchange record is missing."""
+        names = (group.fallback_name for group in self.per_network)
+        return next((name for name in names if name), None)
+
+
+def group_exchanges_by_asn(
+    rows: Iterable[UpstreamNetworkIxLan],
+) -> dict[int, list[ExchangeGroup]]:
+    """Split one multi-network `/netixlan` response into a list per network.
+
+    A batched query answers for several networks at once, and every later step
+    — the intersection and the per-network totals — is per network.
+    """
+    by_asn: dict[int, list[UpstreamNetworkIxLan]] = {}
+    for row in rows:
+        by_asn.setdefault(row.asn, []).append(row)
+    return {asn: group_by_exchange(ports) for asn, ports in by_asn.items()}
+
+
+def shared_exchanges(
+    by_asn: Mapping[int, list[ExchangeGroup]], asns: Sequence[int]
+) -> list[SharedExchangeGroup]:
+    """Exchanges every one of `asns` is present at, widest bottleneck first.
+
+    A network with no rows at all is an empty mapping entry, which makes the
+    intersection empty — correctly, since nothing can be shared with a network
+    that records nothing. Saying *why* it is empty is the tool's job, not this
+    one's.
+    """
+    if not asns:
+        return []
+    indexed = [{group.ix_id: group for group in by_asn.get(asn, [])} for asn in asns]
+    shared = set(indexed[0]).intersection(*indexed[1:])
+    groups = [
+        SharedExchangeGroup(ix_id=ix_id, per_network=tuple(per[ix_id] for per in indexed))
+        for ix_id in shared
+    ]
+    return sorted(groups, key=lambda group: (-(group.bottleneck_mbps or 0), group.ix_id))
+
+
+def shape_shared_exchange(
+    group: SharedExchangeGroup, exchange: UpstreamExchange | None
+) -> SharedExchange:
+    """One shared exchange: where it is, and what each network has there.
+
+    Degrades the same way `shape_exchange_presence` does. An exchange they
+    really do share is worth returning without its city, and is never worth
+    dropping because one lookup came back short.
+    """
+    if exchange is not None:
+        name = exchange.name
+        city, country = exchange.city, exchange.country
+    else:
+        name = group.fallback_name or f"exchange {group.ix_id}"
+        city = country = None
+    return SharedExchange(
+        name=name,
+        city=city,
+        country=country,
+        networks=[
+            ParticipantPorts(
+                asn=member.asn,
+                speed_mbps=member.speed_mbps,
+                ports=len(member.ports),
+                route_server=member.route_server,
+            )
+            for member in group.per_network
+        ],
+    )
+
+
+def group_facilities_by_net_id(
+    rows: Iterable[UpstreamNetworkFacility],
+) -> dict[int, dict[int, UpstreamNetworkFacility]]:
+    """Split one multi-network `/netfac` response, keyed by network then facility.
+
+    Keyed rather than listed because the facility id is what the intersection
+    runs on, and because it collapses a network that somehow records the same
+    facility twice into the one place it is.
+    """
+    by_net: dict[int, dict[int, UpstreamNetworkFacility]] = {}
+    for row in rows:
+        by_net.setdefault(row.net_id, {})[row.fac_id] = row
+    return by_net
+
+
+def shared_facilities(
+    by_net_id: Mapping[int, Mapping[int, UpstreamNetworkFacility]], net_ids: Sequence[int]
+) -> list[UpstreamNetworkFacility]:
+    """Facilities every one of `net_ids` records a presence in.
+
+    Every network's row describes the same building, so the first requested
+    network's row represents it. That is a choice, not an accident: taking
+    whichever row arrived first would reorder the output when upstream did.
+    """
+    if not net_ids:
+        return []
+    indexed = [by_net_id.get(net_id, {}) for net_id in net_ids]
+    shared = set(indexed[0]).intersection(*indexed[1:])
+    return sort_facilities(indexed[0][fac_id] for fac_id in shared)
