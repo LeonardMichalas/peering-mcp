@@ -11,6 +11,7 @@ upstream shape is checked in exactly one place.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from types import TracebackType
 from typing import Any, Self
 
@@ -20,7 +21,13 @@ from peering_mcp.clients.http import Fetched, HttpCore
 from peering_mcp.clients.rate_limit import RateLimiter
 from peering_mcp.config import Config
 from peering_mcp.errors import UpstreamProtocolError
-from peering_mcp.models.upstream import UpstreamNetwork, UpstreamRecord
+from peering_mcp.models.upstream import (
+    UpstreamExchange,
+    UpstreamNetwork,
+    UpstreamNetworkFacility,
+    UpstreamNetworkIxLan,
+    UpstreamRecord,
+)
 
 #: Logging goes to stderr. The MCP transport owns stdout, and a stray line
 #: there corrupts the protocol.
@@ -77,6 +84,68 @@ class PeeringDBClient:
         """Return networks whose name contains `fragment`."""
         fetched = await self._core.get_json("/net", params={"name__contains": fragment})
         return fetched.with_value(parse_records(fetched.value, UpstreamNetwork, source="/net"))
+
+    async def exchange_presence(self, asn: int) -> Fetched[list[UpstreamNetworkIxLan]]:
+        """Return every exchange port a network records, one row per port.
+
+        An unlisted ASN is an empty list here, not a 404: `/netixlan` answers
+        200 for any filter value. Whether the network exists at all is a
+        question for `network_by_asn`.
+        """
+        fetched = await self._core.get_json("/netixlan", params={"asn": asn})
+        rows = parse_records(fetched.value, UpstreamNetworkIxLan, source="/netixlan")
+        _require_filter_applied("/netixlan", "asn", {row.asn for row in rows}, {asn})
+        return fetched.with_value(rows)
+
+    async def facility_presence(self, net_id: int) -> Fetched[list[UpstreamNetworkFacility]]:
+        """Return every facility a network records a presence in.
+
+        Keyed by PeeringDB's own network id, not by ASN. `/netfac` has no
+        working ASN filter: `asn` and `local_asn` are both silently ignored and
+        return the whole table, measured at 61,855 rows and 14 MB. The id is on
+        the `/net` record, which any caller has already fetched.
+        """
+        fetched = await self._core.get_json("/netfac", params={"net_id": net_id})
+        rows = parse_records(fetched.value, UpstreamNetworkFacility, source="/netfac")
+        _require_filter_applied("/netfac", "net_id", {row.net_id for row in rows}, {net_id})
+        return fetched.with_value(rows)
+
+    async def exchanges_by_id(self, ids: Iterable[int]) -> Fetched[list[UpstreamExchange]]:
+        """Return the exchange records for a set of ids, in one request.
+
+        Sorted and de-duplicated before building the query, so the same set
+        always produces the same cache key.
+        """
+        wanted = sorted(set(ids))
+        if not wanted:
+            return Fetched(value=[], from_cache=True)
+        joined = ",".join(str(i) for i in wanted)
+        fetched = await self._core.get_json("/ix", params={"id__in": joined})
+        rows = parse_records(fetched.value, UpstreamExchange, source="/ix")
+        _require_filter_applied("/ix", "id__in", {row.record_id for row in rows}, set(wanted))
+        return fetched.with_value(rows)
+
+
+def _require_filter_applied(
+    source: str, name: str, seen: set[int | None], wanted: set[int]
+) -> None:
+    """Raise if upstream answered with records the filter should have excluded.
+
+    PeeringDB does not reject a filter it does not know. It ignores it and
+    returns the entire table, which arrives as a plausible-looking list of the
+    wrong records rather than as an error. Every query this client builds uses
+    a filter verified by hand, and this is the check that the verification is
+    still true: a value outside the requested set means the filter did not
+    apply, and the honest report is a broken upstream, never a wrong answer.
+    """
+    stray = {value for value in seen if value is not None} - wanted
+    if stray:
+        msg = (
+            f"{source} ignored the {name} filter: "
+            f"{len(stray)} record(s) belong to values that were not requested"
+        )
+        logger.warning("%s", msg)
+        raise UpstreamProtocolError(msg)
 
 
 def parse_records[T: UpstreamRecord](

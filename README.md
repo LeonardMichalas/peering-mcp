@@ -9,7 +9,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** One of the five tools, `lookup_network`, works against live data, and the foundations under it are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other four tools are next. Nothing is published to PyPI yet.
+> **Status: early development.** Two of the five tools, `lookup_network` and `list_presence`, work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other three tools are next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -26,7 +26,7 @@ This server is that way to check.
 | Tool | Question it answers | |
 | --- | --- | --- |
 | `lookup_network` | Who is this network, and what is their peering policy? | ✅ |
-| `list_presence` | Which internet exchanges and facilities are they present at? | planned |
+| `list_presence` | Which internet exchanges and facilities are they present at? | ✅ |
 | `find_at_exchange` | Who else is at this exchange, and would they peer? | planned |
 | `find_common_presence` | **Where can these networks meet each other?** | planned |
 | `lookup_registration` | Who is this IP range or AS number registered to? | planned |
@@ -96,7 +96,7 @@ A request takes one of two paths:
   <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.svg">
 </picture>
 
-That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task.
+That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of 50 exchanges, largest capacity first, in about 6 KB, and says how many it left out.
 
 ## Design principles
 
@@ -149,7 +149,7 @@ claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mc
 }
 ```
 
-Then ask it something an agent normally gets wrong: *"What is Deutsche Telekom's peering policy, and how many internet exchanges are they at?"*
+Then ask it something an agent normally gets wrong: *"What is Deutsche Telekom's peering policy, and which internet exchanges are they at?"*
 
 ## Development
 

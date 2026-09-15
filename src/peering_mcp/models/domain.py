@@ -135,6 +135,58 @@ class NetworkLookup(BaseModel):
     )
 
 
+class ExchangePresence(BaseModel):
+    """One network's presence at one internet exchange, all ports combined."""
+
+    name: str
+    city: str | None = None
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+    speed_mbps: int | None = Field(
+        default=None, description="Total port capacity at this exchange, in Mbps."
+    )
+    ports: int = Field(description="How many separate ports the network records here.")
+    route_server: bool | None = Field(
+        default=None, description="Whether they peer with the exchange's route server."
+    )
+
+
+class FacilityPresence(BaseModel):
+    """One network's presence in one facility."""
+
+    name: str | None = None
+    city: str | None = None
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+
+
+class Page[T](BaseModel):
+    """A bounded slice of a list, and how much of the list it is.
+
+    `total` and `truncated` travel with the items so a caller can never mistake
+    the first fifty of three hundred for the whole.
+    """
+
+    items: list[T]
+    total: int = Field(description="How many there are in all, not just on this page.")
+    truncated: bool = Field(description="True when items holds fewer than total.")
+
+
+class PresenceList(BaseModel):
+    """The payload of `list_presence`.
+
+    A list the caller did not ask for is `None`, so an absent list is never
+    confused with an empty one.
+    """
+
+    asn: int
+    network: str
+    exchanges: Page[ExchangePresence] | None = Field(
+        default=None, description="Largest total port capacity first. None when kind excluded it."
+    )
+    facilities: Page[FacilityPresence] | None = Field(
+        default=None, description="Ordered by country, then city. None when kind excluded it."
+    )
+
+
 class ToolResult[T](BaseModel):
     """The envelope every tool returns."""
 
