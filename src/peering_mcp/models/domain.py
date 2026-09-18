@@ -303,6 +303,58 @@ class ExchangeParticipants(BaseModel):
     )
 
 
+class RegistrationContact(BaseModel):
+    """Who to write to about a registered resource."""
+
+    name: str | None = None
+    email: str | None = None
+
+
+class Registration(BaseModel):
+    """The payload of `lookup_registration`.
+
+    Registry data rather than PeeringDB data, and the difference matters when
+    reading it: nobody self-reports here. A registry publishes what it
+    allocated, so a missing field means the registry does not publish it, not
+    that an operator left it blank.
+
+    **The last-changed date is in `provenance.record_updated`, not here.** It
+    is the same fact the envelope already carries for every other tool, and two
+    copies of a date is one copy too many.
+    """
+
+    target: str = Field(description="What was asked about, as this server read it.")
+    kind: Literal["address", "prefix", "asn"] = Field(
+        description="How the target was read: one address, a prefix, or an AS number."
+    )
+    registry: str | None = Field(
+        default=None, description="The registry that answered, for example RIPE NCC."
+    )
+    handle: str | None = Field(
+        default=None, description="The registry's own identifier for this record."
+    )
+    holder: str | None = Field(
+        default=None, description="Who it is registered to, as the registry publishes it."
+    )
+    covers: str | None = Field(
+        default=None,
+        description="The whole range the registration covers, which may be wider than the target.",
+    )
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+    allocation_type: str | None = Field(
+        default=None, description="How it was allocated, for example ASSIGNED PA."
+    )
+    status: list[str] = Field(
+        default_factory=list, description="Registry status flags, for example active."
+    )
+    registered: datetime | None = Field(
+        default=None, description="When the registry first allocated it."
+    )
+    abuse: RegistrationContact | None = Field(
+        default=None, description="Where to report abuse from this range or AS number."
+    )
+
+
 class ToolResult[T](BaseModel):
     """The envelope every tool returns."""
 

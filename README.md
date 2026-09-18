@@ -9,7 +9,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** Four of the five tools — `lookup_network`, `list_presence`, `find_at_exchange` and `find_common_presence` — work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. `lookup_registration` is next. Nothing is published to PyPI yet.
+> **Status: early development.** All five tools work against live data, across both upstreams: PeeringDB for interconnection, and the regional internet registries over RDAP for registration. The foundations under them are in place — upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. Response-size budgets and a tool-selection evaluation are next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -29,7 +29,7 @@ This server is that way to check.
 | `list_presence` | Which internet exchanges and facilities are they present at? | ✅ |
 | `find_at_exchange` | Who else is at this exchange, and would they peer? | ✅ |
 | `find_common_presence` | **Where can these networks meet each other?** | ✅ |
-| `lookup_registration` | Who is this IP range or AS number registered to? | planned |
+| `lookup_registration` | Who is this IP range or AS number registered to? | ✅ |
 
 `find_common_presence` is the tool that motivated the project. Working out where two or more networks could interconnect means looking each one up, listing everywhere it is present, and intersecting the results by hand. That is about an hour and a dozen browser tabs. It should be one question.
 
@@ -38,6 +38,10 @@ It takes two to five AS numbers and answers in four requests, whatever the numbe
 It also returns how many locations each network has on its own, so an empty answer is explainable: either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
 
 `find_at_exchange` asks it the other way round: who is already at DE-CIX Frankfurt, and which of them will peer with anyone. It takes an exchange name or its PeeringDB id, optionally keeps only the networks stating one peering policy, and returns them largest capacity first. A name matching several exchanges — ten of them are called LINX, on four continents — comes back as candidates to choose between, never a guess at which one was meant.
+
+`lookup_registration` is the one tool here that does not read PeeringDB. It asks the registry that made the allocation — RIPE NCC, ARIN, APNIC, LACNIC or AFRINIC — and answers with the holder, the allocation date, the range the registration actually covers, and where to report abuse. Which registry to ask is itself a lookup, resolved from IANA's own bootstrap files rather than through a third-party redirector, so the answer can say who it came from.
+
+Ask about one address and you get the block it sits in: `8.8.8.8` is answered with `8.8.8.0 - 8.8.8.255`, registered to Google LLC. A range no registry is responsible for, such as `240.0.0.0/8`, is answered without a request leaving the machine.
 
 ### What a result looks like
 
@@ -110,7 +114,7 @@ These are load-bearing, not aspirational. Pull requests are reviewed against the
 - **It says when it does not know.** PeeringDB is self-reported, so a missing record is common and is *not* evidence that something is untrue. The server distinguishes "this network does not exist" from "nobody filled this in", and never fills a gap with a plausible guess.
 - **Every answer carries its source and age.** Including when the upstream record was last edited, because a record untouched since 2019 deserves less weight than one edited last month.
 - **Responses are small on purpose.** Every tool returns a shaped, compact result rather than passing upstream JSON through.
-- **Upstream text is untrusted.** PeeringDB free-text fields are written by the networks themselves and end up in a language model's context. They are allowlisted, length-capped and sanitised before they leave the server.
+- **Upstream text is untrusted.** Free-text fields — PeeringDB's, written by the networks themselves, and a registry record's holder names and contacts — end up in a language model's context. They are allowlisted, length-capped and sanitised before they leave the server.
 - **Polite to upstream.** PeeringDB permits one request per second; the server holds itself to that, caches aggressively, and identifies itself in every request.
 
 ## Data sources
@@ -120,7 +124,7 @@ All public, all free, no scraping.
 | Source | Used for | Auth | Cost |
 | --- | --- | --- | --- |
 | [PeeringDB API v2](https://www.peeringdb.com/apidocs/) | Networks, exchanges, facilities, presence, peering policy | API key recommended, not required | Free |
-| [RDAP](https://about.rdap.org/) | Registration data for IPs, prefixes and AS numbers | None | Free |
+| [RDAP](https://about.rdap.org/) | Registration data for IPs, prefixes and AS numbers, via the [IANA bootstrap files](https://data.iana.org/rdap/) | None | Free |
 
 Later versions may add observed routing data from [RIPEstat](https://stat.ripe.net) and topology from [CAIDA AS Rank](https://asrank.caida.org).
 

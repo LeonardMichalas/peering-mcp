@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Literal
 
 from peering_mcp.models.domain import (
     Exchange,
@@ -29,9 +31,15 @@ from peering_mcp.models.domain import (
     NetworkMatch,
     ParticipantPorts,
     PeeringPolicy,
+    Registration,
+    RegistrationContact,
     SharedExchange,
 )
 from peering_mcp.models.upstream import (
+    RdapAutnum,
+    RdapEntity,
+    RdapIpNetwork,
+    RdapObject,
     UpstreamExchange,
     UpstreamNetwork,
     UpstreamNetworkFacility,
@@ -372,3 +380,139 @@ def shape_participant(group: ExchangeGroup, network: UpstreamNetwork | None) -> 
         route_server=group.route_server,
         policy=network.policy_general if network is not None else None,
     )
+
+
+# --- Registration -----------------------------------------------------------
+
+#: Registry status flags worth carrying. Records rarely have more than one,
+#: and a list of twenty tells a caller nothing the first few did not.
+MAX_STATUS_FLAGS = 4
+
+#: How deep to look for an abuse contact. RIPE puts it at the top level and
+#: ARIN one level down; three is room for a registry that nests it further,
+#: and a stop for one that answers with a cycle of its own making.
+MAX_ENTITY_DEPTH = 3
+
+#: The event actions RDAP uses for the two dates worth having.
+REGISTRATION_EVENT = "registration"
+LAST_CHANGED_EVENT = "last changed"
+
+
+def shape_registration(
+    record: RdapObject, *, target: str, kind: Literal["address", "prefix", "asn"], registry: str
+) -> Registration:
+    """Turn a validated RDAP object into the compact form.
+
+    An RDAP answer runs to 6 KB for a small ARIN record and 19 KB for a RIPE
+    one, measured on 2026-09-18, and almost all of it is postal addresses,
+    terms-of-service notices and links back to the registry's own web pages.
+    What survives is the four things somebody asking "whose is this" actually
+    needs: who holds it, which registry says so, how far the registration
+    reaches, and where to report abuse.
+    """
+    return Registration(
+        target=target,
+        kind=kind,
+        registry=registry,
+        handle=record.handle,
+        holder=registration_holder(record),
+        covers=registration_range(record),
+        country=record.country,
+        allocation_type=record.allocation_type,
+        status=record.status[:MAX_STATUS_FLAGS],
+        registered=event_date(record, REGISTRATION_EVENT),
+        abuse=abuse_contact(record),
+    )
+
+
+def registration_holder(record: RdapObject) -> str | None:
+    """Who the resource is registered to, in the most readable form published.
+
+    **A registrant's name is often not a name.** RIPE lists maintainer objects
+    as registrants alongside the organisation, and their `fn` is just the
+    handle again: AS3320's first registrant is `DTAG-RR`, called "DTAG-RR",
+    and the one worth reporting is `ORG-DTA2-RIPE`, called "Deutsche Telekom
+    AG". So a registrant whose name only repeats its own handle is passed over
+    for one that says something, and the record's own `name` — `DTAG`, `GOGL`
+    — is the last resort rather than the first.
+
+    Measured against RIPE and ARIN records for 193.0.0.0/21, 2001:67c:2e8::/48,
+    AS3320 and 8.8.8.0/24 on 2026-09-18; this rule picks the organisation in
+    all four.
+    """
+    registrants = [entity for entity in record.entities if "registrant" in entity.roles]
+    named = [
+        entity
+        for entity in registrants
+        if entity.contact.full_name and entity.contact.full_name != entity.handle
+    ]
+    for entity in named or registrants:
+        if entity.contact.full_name:
+            return entity.contact.full_name
+    return record.name
+
+
+def registration_range(record: RdapObject) -> str | None:
+    """The whole range the registration covers, as one readable string.
+
+    Worth its own field because it is frequently wider than what was asked
+    about: a question about one address is answered with the block it sits in,
+    and a caller that did not notice would report a /21's holder as the owner
+    of a single machine.
+    """
+    if isinstance(record, RdapIpNetwork):
+        if record.start_address and record.end_address:
+            return f"{record.start_address} - {record.end_address}"
+        return record.start_address or record.end_address
+    if isinstance(record, RdapAutnum):
+        if record.start_autnum is None:
+            return None
+        if record.end_autnum is None or record.end_autnum == record.start_autnum:
+            return f"AS{record.start_autnum}"
+        return f"AS{record.start_autnum} - AS{record.end_autnum}"
+    return None
+
+
+def event_date(record: RdapObject, action: str) -> datetime | None:
+    """When something happened to the record, by RDAP's name for it."""
+    for event in record.events:
+        if event.action == action and event.date is not None:
+            return event.date
+    return None
+
+
+def abuse_contact(record: RdapObject) -> RegistrationContact | None:
+    """Where to report abuse, wherever in the entity tree the registry put it.
+
+    A contact with neither a name nor a mailbox is not returned at all: an
+    empty object in the payload reads as "there is a contact" and answers
+    nothing.
+    """
+    entity = find_entity_by_role(record.entities, "abuse")
+    if entity is None:
+        return None
+    name, email = entity.contact.full_name, entity.contact.email
+    if not name and not email:
+        return None
+    return RegistrationContact(name=name, email=email)
+
+
+def find_entity_by_role(
+    entities: Sequence[RdapEntity], role: str, *, depth: int = MAX_ENTITY_DEPTH
+) -> RdapEntity | None:
+    """The first entity holding a role, searched breadth-first and bounded.
+
+    Breadth-first on purpose: the shallowest match is the one attached to the
+    record being asked about, and a deeper one belongs to somebody the record
+    merely mentions.
+    """
+    if depth <= 0 or not entities:
+        return None
+    for entity in entities:
+        if role in entity.roles:
+            return entity
+    for entity in entities:
+        found = find_entity_by_role(entity.entities, role, depth=depth - 1)
+        if found is not None:
+            return found
+    return None

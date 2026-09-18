@@ -1,0 +1,21 @@
+{
+  "links" : [ {
+    "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+    "rel" : "copyright",
+    "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+  } ],
+  "rdapConformance" : [ "cidr0", "rdap_level_0", "nro_rdap_profile_0", "redacted", "nro_rdap_profile_asn_flat_0" ],
+  "notices" : [ {
+    "title" : "Terms and Conditions",
+    "description" : [ "This is the RIPE Database query service. The objects are in RDAP format." ],
+    "links" : [ {
+      "rel" : "terms-of-service",
+      "href" : "http://www.ripe.net/db/support/db-terms-conditions.pdf",
+      "type" : "application/pdf"
+    } ]
+  } ],
+  "port43" : "whois.ripe.net",
+  "errorCode" : 404,
+  "title" : "Not Found",
+  "description" : [ "Requested object not found" ]
+}

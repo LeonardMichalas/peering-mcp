@@ -1,0 +1,222 @@
+{
+  "handle" : "AS3320",
+  "startAutnum" : 3320,
+  "endAutnum" : 3320,
+  "name" : "DTAG",
+  "status" : [ "active" ],
+  "entities" : [ {
+    "handle" : "DTAG-RR",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG-RR" ], [ "kind", { }, "text", "individual" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/DTAG-RR"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "ORG-DTA2-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Deutsche Telekom AG" ], [ "kind", { }, "text", "org" ], [ "adr", {
+      "label" : "Eduard-Schopf-Allee 1\nD-28217\nBremen\nGERMANY"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+4942151554041" ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+4942151555165" ], [ "tel", {
+      "type" : "fax"
+    }, "text", "+49391580100379" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/ORG-DTA2-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "RIPE-NCC-END-MNT",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "RIPE-NCC-END-MNT" ], [ "kind", { }, "text", "individual" ], [ "org", { }, "text", "ORG-NCC1-RIPE" ] ] ],
+    "roles" : [ "registrant" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/RIPE-NCC-END-MNT"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "SB15220-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Sebastian Becker" ], [ "kind", { }, "text", "individual" ], [ "adr", {
+      "label" : "Deutsche Telekom AG\nWolbecker Str. 268, 48155, Muenster, Deutschland"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "tel", {
+      "type" : "voice"
+    }, "text", "+49 228 18123797" ] ] ],
+    "roles" : [ "administrative", "technical" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "self",
+      "href" : "https://rdap.db.ripe.net/entity/SB15220-RIPE"
+    }, {
+      "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+      "rel" : "copyright",
+      "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+    } ],
+    "objectClassName" : "entity"
+  }, {
+    "handle" : "DTAG3-RIPE",
+    "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "Deutsche Telekom LIR Abuse Contact" ], [ "kind", { }, "text", "group" ], [ "adr", {
+      "label" : "Deutsche Telekom AG"
+    }, "text", [ "", "", "", "", "", "", "" ] ], [ "email", {
+      "type" : "abuse"
+    }, "text", "abuse@telekom.de" ] ] ],
+    "roles" : [ "abuse" ],
+    "entities" : [ {
+      "handle" : "DTAG-NIC",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG-NIC" ], [ "kind", { }, "text", "individual" ] ] ],
+      "roles" : [ "registrant" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3320",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/DTAG-NIC"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    }, {
+      "handle" : "DTAG1-RIPE",
+      "vcardArray" : [ "vcard", [ [ "version", { }, "text", "4.0" ], [ "fn", { }, "text", "DTAG Internet Routing Registry" ], [ "kind", { }, "text", "group" ], [ "adr", {
+        "label" : "Deutsche Telekom Service GmbH\nInternet Services\nEduard-Schopf-Allee 1\nDE 28217 Bremen"
+      }, "text", [ "", "", "", "", "", "", "" ] ] ] ],
+      "roles" : [ "administrative", "technical" ],
+      "links" : [ {
+        "value" : "https://rdap.db.ripe.net/autnum/3320",
+        "rel" : "self",
+        "href" : "https://rdap.db.ripe.net/entity/DTAG1-RIPE"
+      }, {
+        "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+        "rel" : "copyright",
+        "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+      } ],
+      "objectClassName" : "entity"
+    } ],
+    "objectClassName" : "entity"
+  } ],
+  "remarks" : [ {
+    "description" : [ "Internet service provider operations", "peering coordinators for AS3320: <peering@telekom.de>", "abuse reports should be sent to the contacts listed in the registry entries for the IP address of the offending host system", "We share the view that for many networks (including ours:-) only some abstraction of the actual routing policy should/can be published in the IRR. Right now we are abstracting to a very essential minimum.", "the most important and helpful use of the IRR is to publish what a network will announce to peers and upstream", "we encourage all our neighbors to define and maintain an AS-set to describe their announcements, and to register all the routes (and have their customers do so as well)", "we maintain a list of what our neighbors have told us about their announcements towards AS3320 - in terms of AS-set (preferred), AS number, route-set (and the IRR database used to publish)", "in fact we apply route filters based on this for all neighbors - as far as feasible", "for data published through the RIPE routing registry we generate filters automatically", "we consider the integration of RIR and routing registry data and the application of RPSS authorization a great feature of the RIPE routing registry", "customers are strongly encouraged to define and maintain an AS-set that we will include in the definition of AS3320:AS-DTAG (if we are told the name)", "this will be sufficient to have our peers accept the routes", "in any case peers - and any network in the Internet - is free to apply some selective policy (e.g. prefix length based)", "unfortunately some customers do not provide usable IRR data; we will NOT add to the uncontrolled garbage in the IRR by proxy registering in some database that requires no authorization", "we advise customers that routes without IRR registration and not covered by AS3320:AS-DTAG may receive less than full support by some of our peer networks and other parts of the Internet", "============================================================== IPv6 we do/publish essentially the same like for IPv4", "==============================================================" ]
+  } ],
+  "links" : [ {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-up",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-up/AS3320",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-up rdap-active",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-up/AS3320?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-down",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-down/AS3320",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-top",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-top/AS3320",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-top rdap-active",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-top/AS3320?status=active",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "rdap-bottom",
+    "href" : "https://rdap.db.ripe.net/autnums/rirSearch1/rdap-bottom/AS3320",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "https://rdap.db.ripe.net/autnum/3320",
+    "rel" : "self",
+    "href" : "https://rdap.db.ripe.net/autnum/3320",
+    "type" : "application/rdap+json"
+  }, {
+    "value" : "http://www.ripe.net/data-tools/support/documentation/terms",
+    "rel" : "copyright",
+    "href" : "http://www.ripe.net/data-tools/support/documentation/terms"
+  } ],
+  "events" : [ {
+    "eventAction" : "registration",
+    "eventDate" : "1970-01-01T00:00:00Z"
+  }, {
+    "eventAction" : "last changed",
+    "eventDate" : "2020-12-11T15:33:02Z"
+  } ],
+  "rdapConformance" : [ "nro_rdap_profile_asn_flat_0", "rirSearch1", "autnums", "cidr0", "rdap_level_0", "nro_rdap_profile_0", "redacted" ],
+  "notices" : [ {
+    "title" : "Filtered",
+    "description" : [ "This output has been filtered." ]
+  }, {
+    "title" : "Whois Inaccuracy Reporting",
+    "description" : [ "If you see inaccuracies in the results, please visit:" ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "inaccuracy-report",
+      "href" : "https://www.ripe.net/contact-form?topic=ripe_dbm&show_form=true",
+      "type" : "text/html"
+    } ]
+  }, {
+    "title" : "Source",
+    "description" : [ "Objects returned came from source", "RIPE" ]
+  }, {
+    "title" : "Terms and Conditions",
+    "description" : [ "This is the RIPE Database query service. The objects are in RDAP format." ],
+    "links" : [ {
+      "value" : "https://rdap.db.ripe.net/autnum/3320",
+      "rel" : "terms-of-service",
+      "href" : "http://www.ripe.net/db/support/db-terms-conditions.pdf",
+      "type" : "application/pdf"
+    } ]
+  } ],
+  "port43" : "whois.ripe.net",
+  "objectClassName" : "autnum",
+  "redacted" : [ {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='ORG-DTA2-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='SB15220-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  }, {
+    "name" : {
+      "description" : "Personal e-mail information"
+    },
+    "reason" : {
+      "description" : "Personal data"
+    },
+    "prePath" : "$.entities[?(@.handle=='DTAG3-RIPE')].vcardArray[1][?(@[0]=='e-mail')]",
+    "method" : "removal"
+  } ]
+}

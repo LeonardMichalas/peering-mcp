@@ -1,0 +1,13 @@
+{
+  "objectClassName": "autnum",
+  "handle": "AS12345",
+  "startAutnum": 12345,
+  "endAutnum": 12345,
+  "rdapConformance": ["rdap_level_0"],
+  "notices": [
+    {
+      "title": "Terms and Conditions",
+      "description": ["Whois inaccuracy? Please report it here."]
+    }
+  ]
+}
