@@ -20,6 +20,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from peering_mcp.models.domain import (
+    Exchange,
+    ExchangeMatch,
+    ExchangeParticipant,
     ExchangePresence,
     FacilityPresence,
     Network,
@@ -308,3 +311,64 @@ def shared_facilities(
     indexed = [by_net_id.get(net_id, {}) for net_id in net_ids]
     shared = set(indexed[0]).intersection(*indexed[1:])
     return sort_facilities(indexed[0][fac_id] for fac_id in shared)
+
+
+# --- One exchange, every network at it --------------------------------------
+
+
+def shape_exchange(record: UpstreamExchange) -> Exchange:
+    """The exchange a question was asked about: which one it is, and where."""
+    return Exchange(
+        exchange_id=record.record_id,
+        name=record.name,
+        city=record.city,
+        country=record.country,
+        networks_recorded=record.net_count,
+    )
+
+
+def shape_exchange_match(record: UpstreamExchange) -> ExchangeMatch:
+    """A candidate in an ambiguous name search: enough to choose, nothing more."""
+    return ExchangeMatch(
+        exchange_id=record.record_id,
+        name=record.name,
+        city=record.city,
+        country=record.country,
+    )
+
+
+def group_by_network(rows: Iterable[UpstreamNetworkIxLan]) -> list[ExchangeGroup]:
+    """Fold one exchange's port rows into one group per network, largest first.
+
+    The same fold as `group_by_exchange`, turned the other way round: there the
+    rows belong to one network and are keyed by exchange, here they belong to
+    one exchange and are keyed by network. `ExchangeGroup` is reused rather
+    than copied because everything asked of it — the summed speed, the port
+    count, the route-server flag — is the same question about the same rows.
+
+    Ties break on the AS number, so the order is stable across runs.
+    """
+    ports: dict[int, list[UpstreamNetworkIxLan]] = {}
+    for row in rows:
+        ports.setdefault(row.asn, []).append(row)
+    groups = [ExchangeGroup(ix_id=rows[0].ix_id, ports=tuple(rows)) for rows in ports.values()]
+    return sorted(groups, key=lambda group: (-(group.speed_mbps or 0), group.asn))
+
+
+def shape_participant(group: ExchangeGroup, network: UpstreamNetwork | None) -> ExchangeParticipant:
+    """One network at an exchange: who they are, how much they have, and their policy.
+
+    Name and policy live on the network record, not the port row, which is why
+    the networks are looked up separately. Without that record the entry keeps
+    the AS number and the ports — a network that really is there is worth
+    returning unnamed, and is never worth dropping because one lookup came
+    back short.
+    """
+    return ExchangeParticipant(
+        asn=group.asn,
+        name=network.name if network is not None else None,
+        speed_mbps=group.speed_mbps,
+        ports=len(group.ports),
+        route_server=group.route_server,
+        policy=network.policy_general if network is not None else None,
+    )

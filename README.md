@@ -9,7 +9,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** Three of the five tools, `lookup_network`, `list_presence` and `find_common_presence`, work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. The other two tools are next. Nothing is published to PyPI yet.
+> **Status: early development.** Four of the five tools — `lookup_network`, `list_presence`, `find_at_exchange` and `find_common_presence` — work against live data, and the foundations under them are in place: upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. `lookup_registration` is next. Nothing is published to PyPI yet.
 
 > A personal side project, written in my own free time.
 
@@ -27,7 +27,7 @@ This server is that way to check.
 | --- | --- | --- |
 | `lookup_network` | Who is this network, and what is their peering policy? | ✅ |
 | `list_presence` | Which internet exchanges and facilities are they present at? | ✅ |
-| `find_at_exchange` | Who else is at this exchange, and would they peer? | planned |
+| `find_at_exchange` | Who else is at this exchange, and would they peer? | ✅ |
 | `find_common_presence` | **Where can these networks meet each other?** | ✅ |
 | `lookup_registration` | Who is this IP range or AS number registered to? | planned |
 
@@ -36,6 +36,8 @@ This server is that way to check.
 It takes two to five AS numbers and answers in four requests, whatever the number of networks. Shared exchanges come back widest bottleneck first — ordered by the smallest capacity any one network has there, because that is what a connection between them would be limited by.
 
 It also returns how many locations each network has on its own, so an empty answer is explainable: either the networks genuinely do not overlap, or one of them has no records at all, which is a very different thing.
+
+`find_at_exchange` asks it the other way round: who is already at DE-CIX Frankfurt, and which of them will peer with anyone. It takes an exchange name or its PeeringDB id, optionally keeps only the networks stating one peering policy, and returns them largest capacity first. A name matching several exchanges — ten of them are called LINX, on four continents — comes back as candidates to choose between, never a guess at which one was meant.
 
 ### What a result looks like
 

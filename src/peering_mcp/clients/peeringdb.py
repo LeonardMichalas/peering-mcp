@@ -159,6 +159,57 @@ class PeeringDBClient:
         _require_filter_applied("/netfac", "net_id__in", {row.net_id for row in rows}, wanted)
         return fetched.with_value(rows)
 
+    async def exchange_by_id(self, ix_id: int) -> Fetched[UpstreamExchange | None]:
+        """Return one exchange by its PeeringDB id, or None if there is no such id.
+
+        The counterpart of `network_by_asn`, and needed for the same reason:
+        `/netixlan` answers 200 with an empty list for any `ix_id`, listed or
+        not, so without this an exchange nobody has heard of and a real one
+        with no participants would look identical.
+        """
+        fetched = await self._core.get_json("/ix", params={"id": ix_id})
+        records = parse_records(fetched.value, UpstreamExchange, source="/ix")
+        return fetched.with_value(records[0] if records else None)
+
+    async def exchanges_by_name(self, fragment: str) -> Fetched[list[UpstreamExchange]]:
+        """Return exchanges whose name contains `fragment`."""
+        fetched = await self._core.get_json("/ix", params={"name__contains": fragment})
+        return fetched.with_value(parse_records(fetched.value, UpstreamExchange, source="/ix"))
+
+    async def participants(self, ix_id: int) -> Fetched[list[UpstreamNetworkIxLan]]:
+        """Return every port every network records at one exchange.
+
+        The inverse of `exchange_presence`: the same rows, filtered the other
+        way round.
+        """
+        fetched = await self._core.get_json("/netixlan", params={"ix_id": ix_id})
+        rows = parse_records(fetched.value, UpstreamNetworkIxLan, source="/netixlan")
+        _require_filter_applied("/netixlan", "ix_id", {row.ix_id for row in rows}, {ix_id})
+        return fetched.with_value(rows)
+
+    async def networks_at_exchange(self, ix_id: int, policy: str) -> Fetched[list[UpstreamNetwork]]:
+        """Networks at one exchange whose stated general policy is `policy`.
+
+        Two filters at once, because a policy filter has to be applied before a
+        page is cut: asking only about the networks on the page would filter
+        the page rather than the exchange.
+
+        `policy` must be spelled the way PeeringDB spells it — `Open`, not
+        `open` — or the check below reads a correctly applied filter as an
+        ignored one. The tool layer canonicalises it.
+
+        Only the policy filter is verified here. If `ix` were ignored this
+        would answer with every network in the registry, and the caller keeps
+        only the AS numbers that also appear in the exchange's own port rows,
+        so an ignored filter costs time and cannot produce a wrong answer.
+        """
+        fetched = await self._core.get_json("/net", params={"ix": ix_id, "policy_general": policy})
+        rows = parse_records(fetched.value, UpstreamNetwork, source="/net")
+        _require_filter_applied(
+            "/net", "policy_general", {row.policy_general for row in rows}, {policy}
+        )
+        return fetched.with_value(rows)
+
     async def exchanges_by_id(self, ids: Iterable[int]) -> Fetched[list[UpstreamExchange]]:
         """Return the exchange records for a set of ids, in one request.
 
@@ -185,8 +236,8 @@ def _in_filter(values: Iterable[int]) -> tuple[set[int], str]:
     return set(wanted), ",".join(str(value) for value in wanted)
 
 
-def _require_filter_applied(
-    source: str, name: str, seen: set[int | None], wanted: set[int]
+def _require_filter_applied[T](
+    source: str, name: str, seen: Iterable[T | None], wanted: set[T]
 ) -> None:
     """Raise if upstream answered with records the filter should have excluded.
 

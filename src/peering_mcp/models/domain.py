@@ -239,6 +239,70 @@ class CommonPresence(BaseModel):
     )
 
 
+class Exchange(BaseModel):
+    """An internet exchange, as PeeringDB describes it."""
+
+    exchange_id: int = Field(
+        description="PeeringDB's own id. Ask again with this to skip the name search."
+    )
+    name: str
+    city: str | None = None
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+    networks_recorded: int | None = Field(
+        default=None, description="How many networks PeeringDB records at this exchange."
+    )
+
+
+class ExchangeMatch(BaseModel):
+    """One candidate from an ambiguous exchange name search."""
+
+    exchange_id: int
+    name: str
+    city: str | None = None
+    country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
+
+
+class ExchangeParticipant(BaseModel):
+    """One network at the exchange being asked about, all its ports combined."""
+
+    asn: int
+    name: str | None = None
+    speed_mbps: int | None = Field(
+        default=None, description="Total port capacity this network has here, in Mbps."
+    )
+    ports: int = Field(description="How many separate ports this network records here.")
+    route_server: bool | None = Field(
+        default=None, description="Whether they peer with the exchange's route server."
+    )
+    policy: str | None = Field(
+        default=None,
+        description="Their general peering policy: Open, Selective, Restrictive or No.",
+    )
+
+
+class ExchangeParticipants(BaseModel):
+    """The payload of `find_at_exchange`.
+
+    The same two-in-one shape as `NetworkLookup`, for the same reason: an
+    exchange name can match several exchanges, and a caller must never have to
+    probe the payload to find out which kind of answer it got. The envelope's
+    status says.
+    """
+
+    exchange: Exchange | None = Field(
+        default=None, description="Set when status is ok: the query resolved to one exchange."
+    )
+    networks: Page[ExchangeParticipant] | None = Field(
+        default=None,
+        description="Set when status is ok. Largest total port capacity first.",
+    )
+    candidates: list[ExchangeMatch] = Field(
+        default_factory=list,
+        description="Set when status is ambiguous: a name matched several exchanges. "
+        "Call again with one of these ids.",
+    )
+
+
 class ToolResult[T](BaseModel):
     """The envelope every tool returns."""
 
