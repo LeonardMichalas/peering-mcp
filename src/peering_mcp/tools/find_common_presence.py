@@ -38,11 +38,7 @@ from datetime import datetime
 
 from peering_mcp.clients.http import Fetched
 from peering_mcp.clients.peeringdb import PeeringDBClient
-from peering_mcp.errors import (
-    UpstreamError,
-    UpstreamNotFoundError,
-    UpstreamRateLimitedError,
-)
+from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     CommonPresence,
     FacilityPresence,
@@ -62,6 +58,7 @@ from peering_mcp.shaping import (
     shared_exchanges,
     shared_facilities,
 )
+from peering_mcp.tools._envelope import upstream_failure
 from peering_mcp.tools.lookup_network import _MAX_ASN, _MIN_ASN
 
 #: Two networks is the smallest question worth asking. Five is where the cold
@@ -111,16 +108,8 @@ async def find_common_presence(
         return await _find(client, wanted, limit)
     except UpstreamNotFoundError:
         return _not_found(wanted)
-    except UpstreamRateLimitedError:
-        return ToolResult(
-            status=Status.RATE_LIMITED,
-            note="PeeringDB is throttling requests. Wait a moment and try again.",
-        )
     except UpstreamError as exc:
-        return ToolResult(
-            status=Status.UPSTREAM_UNAVAILABLE,
-            note=f"Could not reach PeeringDB: {exc}",
-        )
+        return upstream_failure(exc)
 
 
 async def _find(client: PeeringDBClient, asns: list[int], limit: int) -> ToolResult[CommonPresence]:

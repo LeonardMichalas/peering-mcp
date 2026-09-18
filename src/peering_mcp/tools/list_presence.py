@@ -25,11 +25,7 @@ from typing import Literal
 
 from peering_mcp.clients.http import Fetched
 from peering_mcp.clients.peeringdb import PeeringDBClient
-from peering_mcp.errors import (
-    UpstreamError,
-    UpstreamNotFoundError,
-    UpstreamRateLimitedError,
-)
+from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     ExchangePresence,
     FacilityPresence,
@@ -46,6 +42,7 @@ from peering_mcp.shaping import (
     shape_facility_presence,
     sort_facilities,
 )
+from peering_mcp.tools._envelope import upstream_failure
 from peering_mcp.tools.lookup_network import _MAX_ASN, _MIN_ASN
 
 Kind = Literal["ix", "facility", "both"]
@@ -84,16 +81,8 @@ async def list_presence(
         return await _list(client, asn, kind, limit)
     except UpstreamNotFoundError:
         return _not_found(asn)
-    except UpstreamRateLimitedError:
-        return ToolResult(
-            status=Status.RATE_LIMITED,
-            note="PeeringDB is throttling requests. Wait a moment and try again.",
-        )
     except UpstreamError as exc:
-        return ToolResult(
-            status=Status.UPSTREAM_UNAVAILABLE,
-            note=f"Could not reach PeeringDB: {exc}",
-        )
+        return upstream_failure(exc)
 
 
 async def _list(

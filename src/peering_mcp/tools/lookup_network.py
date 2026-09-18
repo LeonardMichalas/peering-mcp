@@ -13,11 +13,7 @@ from __future__ import annotations
 import re
 
 from peering_mcp.clients.peeringdb import NAME_MATCH_LIMIT, PeeringDBClient
-from peering_mcp.errors import (
-    UpstreamError,
-    UpstreamNotFoundError,
-    UpstreamRateLimitedError,
-)
+from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     NetworkLookup,
     Provenance,
@@ -25,6 +21,7 @@ from peering_mcp.models.domain import (
     ToolResult,
 )
 from peering_mcp.shaping import shape_network, shape_network_match
+from peering_mcp.tools._envelope import upstream_failure
 
 #: The valid 32-bit AS number range. 0 and 4294967295 are reserved.
 _MIN_ASN = 1
@@ -72,16 +69,8 @@ async def lookup_network(client: PeeringDBClient, query: str) -> ToolResult[Netw
             note=f"PeeringDB has no network matching {cleaned!r}. "
             "A network can exist and route traffic without being listed here.",
         )
-    except UpstreamRateLimitedError:
-        return ToolResult(
-            status=Status.RATE_LIMITED,
-            note="PeeringDB is throttling requests. Wait a moment and try again.",
-        )
     except UpstreamError as exc:
-        return ToolResult(
-            status=Status.UPSTREAM_UNAVAILABLE,
-            note=f"Could not reach PeeringDB: {exc}",
-        )
+        return upstream_failure(exc)
 
 
 async def _by_asn(client: PeeringDBClient, asn: int) -> ToolResult[NetworkLookup]:
