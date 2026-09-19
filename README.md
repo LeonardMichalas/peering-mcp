@@ -45,9 +45,9 @@ It also returns how many locations each network has on its own, so an empty answ
 
 Ask about one address and you get the block it sits in: `8.8.8.8` is answered with `8.8.8.0 - 8.8.8.255`, registered to Google LLC. A range no registry is responsible for, such as `240.0.0.0/8`, is answered without a request leaving the machine.
 
-### What a result looks like
+## What an answer looks like
 
-Asking `lookup_network` for `AS3320` returns this — the whole response, 854 bytes on the wire, against a 42-field upstream record:
+Every tool returns the same envelope, so a model learns one shape rather than five. Asking `lookup_network` for `AS3320` returns this — the whole response, 854 bytes on the wire, against a 42-field upstream record:
 
 ```json
 {
@@ -91,9 +91,9 @@ Asking `lookup_network` for `AS3320` returns this — the whole response, 854 by
 The `status` field is the first thing to read, and `ok` means one thing only: the answer is in `data`. A name matching several networks returns `ambiguous` with the candidates to choose between, never a guess at which one was meant. An AS number that is not listed returns `not_found`, with a note saying a network can route traffic without being registered.
 
 
-## Three questions, three answers
+### Three more, from the tools that do the work
 
-Real responses, trimmed where marked. Nothing here is illustrative: each one is what the tool returned on 2026-09-19.
+Real responses, trimmed where marked. Nothing here is illustrative: each is what the tool returned on 2026-09-19.
 
 **"Where could Deutsche Telekom and Hurricane Electric peer with each other?"** — one call to `find_common_presence` with `[3320, 6939]`, four upstream requests:
 
