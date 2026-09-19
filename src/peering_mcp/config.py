@@ -7,6 +7,7 @@ no environment set at all; a PeeringDB API key only raises the rate limit.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
@@ -19,6 +20,38 @@ from peering_mcp import __version__
 PEERINGDB_REQUESTS_PER_SECOND: Final = 1.0
 
 _REPO_URL: Final = "https://github.com/LeonardMichalas/peering-mcp"
+
+#: What a tool's answer is allowed to cost, in bytes of compact JSON.
+#:
+#: **Per list, not per response.** `list_presence` with `kind="both"` returns
+#: two lists and each is held to this line on its own, because the alternative
+#: is a budget that contradicts itself: exchanges alone measured 6,100 bytes at
+#: T8 and facilities 3,821, both of which are answers somebody asked for, and
+#: their sum is not. The tools with no list in them — `lookup_network` and
+#: `lookup_registration` — are held to the whole response.
+#:
+#: Kept here rather than in each test, so the line exists once and every test
+#: that claims to enforce it enforces the same number.
+RESPONSE_BUDGETS: Final[Mapping[str, int]] = {
+    "lookup_network": 2 * 1024,
+    "lookup_registration": 2 * 1024,
+    "list_presence": 6 * 1024,
+    "find_at_exchange": 6 * 1024,
+    "find_common_presence": 4 * 1024,
+}
+
+#: What is set aside, inside a list's budget, for everything that is not the
+#: list: the status, the note, the provenance, and the object the list belongs
+#: to. The largest of those measured 1,062 bytes with every field at its cap —
+#: an exchange with a 200-character name and city, the longest note any tool
+#: writes, and a full provenance. `test_budgets.py` fails if it ever outgrows
+#: this reserve, which is what the 90 bytes of margin are for.
+LIST_ENVELOPE_RESERVE: Final = 1152
+
+
+def list_budget(tool: str) -> int:
+    """How many bytes one list from `tool` may spend on its items."""
+    return RESPONSE_BUDGETS[tool] - LIST_ENVELOPE_RESERVE
 
 
 def _env_bool(name: str, *, default: bool) -> bool:

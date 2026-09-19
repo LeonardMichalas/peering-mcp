@@ -31,6 +31,7 @@ from datetime import datetime
 
 from peering_mcp.clients.http import Fetched
 from peering_mcp.clients.peeringdb import NAME_MATCH_LIMIT, PeeringDBClient
+from peering_mcp.config import list_budget
 from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     ExchangeParticipant,
@@ -152,10 +153,10 @@ async def _find(
         page, total = matching[:limit], len(matching)
     fetches.append(detail)
 
-    networks = Page[ExchangeParticipant](
-        items=[shape_participant(group, by_asn.get(group.asn)) for group in page],
+    networks = Page[ExchangeParticipant].within_budget(
+        [shape_participant(group, by_asn.get(group.asn)) for group in page],
         total=total,
-        truncated=total > len(page),
+        budget=list_budget("find_at_exchange"),
     )
     return ToolResult(
         status=Status.OK,
@@ -248,6 +249,10 @@ def _note(
             f"{_SELF_REPORTED} {networks.total} of the {present} networks here "
             f"state policy {policy}."
         )
+    if len(networks.items) < limit:
+        # The budget cut the page before the limit did, so asking again with a
+        # higher limit would return this same page.
+        return f"{_SELF_REPORTED} {shown} — as much as the answer budget fits."
     return f"{_SELF_REPORTED} {shown}; raise limit for more, at most {MAX_LIMIT}."
 
 

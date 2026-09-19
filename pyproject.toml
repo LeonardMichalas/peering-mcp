@@ -31,6 +31,12 @@ Issues = "https://github.com/LeonardMichalas/peering-mcp/issues"
 peering-mcp = "peering_mcp.server:main"
 
 [dependency-groups]
+# The evaluation harness, which is not part of the test suite: it calls a real
+# model and costs real money, so it is opt-in and never runs in CI.
+eval = [
+    "anthropic>=0.40",
+    "pyyaml>=6.0",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",

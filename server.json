@@ -1,0 +1,54 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.LeonardMichalas/peering-mcp",
+  "description": "Look up how networks connect on the public internet: who peers with whom, where they meet, under what policy, and who an address range is registered to.",
+  "version": "0.1.0",
+  "websiteUrl": "https://github.com/LeonardMichalas/peering-mcp",
+  "repository": {
+    "url": "https://github.com/LeonardMichalas/peering-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "peering-mcp",
+      "version": "0.1.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PEERINGDB_API_KEY",
+          "description": "A free PeeringDB API key. Recommended, not required: it raises the rate limit, and every tool works without one.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "PEERING_MCP_CACHE_TTL",
+          "description": "How long a cached upstream response stays usable, in seconds.",
+          "default": "86400"
+        },
+        {
+          "name": "PEERING_MCP_CACHE_DIR",
+          "description": "Where the on-disk cache lives. Defaults to $XDG_CACHE_HOME/peering-mcp."
+        },
+        {
+          "name": "PEERING_MCP_NO_CACHE",
+          "description": "Set to 1 to disable caching. Slower, and harder on the upstream APIs."
+        },
+        {
+          "name": "PEERING_MCP_TIMEOUT",
+          "description": "Per-request timeout in seconds.",
+          "default": "10"
+        },
+        {
+          "name": "PEERING_MCP_MAX_RETRIES",
+          "description": "Attempts before an upstream failure is reported.",
+          "default": "3"
+        }
+      ]
+    }
+  ]
+}

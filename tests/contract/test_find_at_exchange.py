@@ -25,15 +25,16 @@ import pytest
 import respx
 
 from peering_mcp.clients.peeringdb import PeeringDBClient
-from peering_mcp.config import Config
+from peering_mcp.config import RESPONSE_BUDGETS, Config
 from peering_mcp.models.domain import Status
 from peering_mcp.tools.find_at_exchange import MAX_LIMIT, find_at_exchange
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "peeringdb"
 API = "https://www.peeringdb.com/api"
 
-#: The design's budget for this tool, in bytes of compact JSON.
-BUDGET = 6 * 1024
+#: The design's budget for this tool, in bytes of compact JSON. Imported
+#: rather than restated: a budget written down twice is a budget that drifts.
+BUDGET = RESPONSE_BUDGETS["find_at_exchange"]
 
 #: What the recording holds, asserted so a re-recording cannot quietly move
 #: the ground under every count below.
@@ -197,8 +198,8 @@ async def test_the_page_is_a_slice_with_the_total(
     page = result.data.networks
     assert page.total == BCIX_NETWORKS
     assert page.truncated is True
-    assert len(page.items) == 50
-    assert "Showing the 50 largest of 142 networks" in result.note
+    assert 0 < len(page.items) <= 50, "the limit is a ceiling, the budget may lower it"
+    assert f"Showing the {len(page.items)} largest of 142 networks" in result.note
 
 
 @respx.mock
@@ -213,12 +214,16 @@ async def test_the_page_is_largest_ports_first(
 
 @respx.mock
 async def test_ports_are_summed_per_network(config: Config, bcix: dict[str, respx.Route]) -> None:
-    """175 port rows, 142 networks: somebody at BCIX has more than one port."""
+    """175 port rows, 142 networks: somebody at BCIX has more than one port.
+
+    The total counts networks rather than rows, which is the fold. The page
+    itself is shorter than the total here, because 142 entries do not fit the
+    answer budget — a different claim, tested below.
+    """
     result = await call(config, exchange="87", limit=MAX_LIMIT)
 
-    assert len(result.data.networks.items) == BCIX_NETWORKS
+    assert result.data.networks.total == BCIX_NETWORKS, "networks, not port rows"
     assert max(entry.ports for entry in result.data.networks.items) > 1
-    assert sum(entry.ports for entry in result.data.networks.items) == 175
 
 
 @respx.mock
@@ -231,15 +236,21 @@ async def test_every_network_on_the_page_has_a_name_and_a_policy(
     for entry in result.data.networks.items:
         assert entry.name is not None, entry
         assert entry.policy is not None, entry
-    requested = bcix["net"].calls.last.request.url.params["asn__in"].split(",")
-    assert len(requested) == 50
-    assert {int(value) for value in requested} == {
-        entry.asn for entry in result.data.networks.items
+    requested = {
+        int(value) for value in bcix["net"].calls.last.request.url.params["asn__in"].split(",")
     }
+    assert len(requested) == 50, "names are asked for once, for the page the limit allows"
+    assert {entry.asn for entry in result.data.networks.items} <= requested, (
+        "the budget can trim the page after the names are fetched, never extend it"
+    )
 
 
 @respx.mock
 async def test_a_short_list_is_not_truncated(config: Config, bcix: dict[str, respx.Route]) -> None:
+    """A handful of networks fits any limit and any budget, so nothing is cut."""
+    rows = fixture("netixlan_ix87.json")["data"][:3]
+    bcix["netixlan"].mock(return_value=httpx.Response(200, json={"meta": {}, "data": rows}))
+
     result = await call(config, exchange="87", limit=MAX_LIMIT)
 
     assert result.data.networks.truncated is False
@@ -408,8 +419,12 @@ async def test_the_cap_holds_the_largest_answer_down(
 ) -> None:
     result = await call(config, exchange="87", limit=10_000)
 
-    assert len(result.data.networks.items) == BCIX_NETWORKS, "clamped to MAX_LIMIT, then to 142"
-    assert compact_size(result) < 20 * 1024
+    page = result.data.networks
+    assert len(page.items) < BCIX_NETWORKS, "clamped to MAX_LIMIT, then to what fits"
+    assert page.total == BCIX_NETWORKS, "and it still says how many there are"
+    assert page.truncated is True
+    assert compact_size(result) <= BUDGET, "no limit buys a response over the line"
+    assert "answer budget" in result.note, "and the note says asking again will not help"
 
 
 # --- Input --------------------------------------------------------------------

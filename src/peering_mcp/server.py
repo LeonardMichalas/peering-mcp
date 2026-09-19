@@ -128,7 +128,9 @@ async def list_presence(
     to find who else is at an exchange; that is find_at_exchange.
 
     Read the status before the data. A status of ok means the lists are in
-    data; check truncated on each, and raise limit if you need more. A status
+    data; check truncated on each, and raise limit if you need more — unless
+    the note says the answer budget cut the list, in which case a higher limit
+    returns the same page. A status
     of not_recorded means the network is listed in PeeringDB but has entered
     no presence of the kind asked for, which is common and is not evidence it
     has none. A status of not_found means PeeringDB has no such network at all.
@@ -166,7 +168,9 @@ async def find_common_presence(asns: list[int], limit: int = 25) -> ToolResult[C
         of everywhere each one is present. Shared exchanges come widest
         bottleneck first: the ordering is by the smallest capacity any one
         network has there, because that is what a connection between them
-        would be limited by.
+        would be limited by. Each list is cut to fit the answer budget, so a
+        truncated list may hold fewer than the limit asked for; the note says
+        when that is what happened.
 
     Do not use this for where a single network is present; that is
     list_presence. Do not use it to find who else is at one exchange; that is
@@ -224,7 +228,9 @@ async def find_at_exchange(
     meet; that is find_common_presence, which intersects them for you.
 
     Read the status before the data. A status of ok means the list is in
-    data.networks; check truncated, and raise limit if you need more. An ok
+    data.networks; check truncated, and raise limit if you need more — unless
+    the note says the answer budget cut the list, in which case a higher limit
+    returns the same page. An ok
     result with an empty list and a policy filter is a real answer: networks
     are there, none of them state that policy, and the note says so. A status
     of ambiguous means the name matched several exchanges: data.candidates

@@ -38,6 +38,7 @@ from datetime import datetime
 
 from peering_mcp.clients.http import Fetched
 from peering_mcp.clients.peeringdb import PeeringDBClient
+from peering_mcp.config import list_budget
 from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     CommonPresence,
@@ -153,17 +154,17 @@ async def _find(client: PeeringDBClient, asns: list[int], limit: int) -> ToolRes
     detail = await client.exchanges_by_id(group.ix_id for group in page)
     fetches.append(detail)
     known = {record.record_id: record for record in detail.value}
-    exchanges = Page[SharedExchange](
-        items=[shape_shared_exchange(group, known.get(group.ix_id)) for group in page],
+    exchanges = Page[SharedExchange].within_budget(
+        [shape_shared_exchange(group, known.get(group.ix_id)) for group in page],
         total=len(matches),
-        truncated=len(matches) > limit,
+        budget=list_budget("find_common_presence"),
     )
 
     sites_shared = shared_facilities(facilities_by_net, keys)
-    facilities = Page[FacilityPresence](
-        items=[shape_facility_presence(row) for row in sites_shared[:limit]],
+    facilities = Page[FacilityPresence].within_budget(
+        [shape_facility_presence(row) for row in sites_shared[:limit]],
         total=len(sites_shared),
-        truncated=len(sites_shared) > limit,
+        budget=list_budget("find_common_presence"),
     )
 
     data = CommonPresence(networks=totals, exchanges=exchanges, facilities=facilities)
@@ -220,13 +221,24 @@ def _note(
 
     cuts = []
     if exchanges.truncated:
-        cuts.append(f"{limit} of {exchanges.total} shared exchanges (widest bottleneck first)")
+        cuts.append(
+            f"{len(exchanges.items)} of {exchanges.total} shared exchanges "
+            "(widest bottleneck first)"
+        )
     if facilities.truncated:
-        cuts.append(f"{limit} of {facilities.total} shared facilities (by country)")
+        cuts.append(f"{len(facilities.items)} of {facilities.total} shared facilities (by country)")
     if not cuts:
         return _SELF_REPORTED
-    return (
-        f"{_SELF_REPORTED} Showing {' and '.join(cuts)}; raise limit for more, at most {MAX_LIMIT}."
+
+    # The budget cutting a list before the limit does means a higher limit
+    # would return the same page, so the advice changes with the reason.
+    budget_bound = (exchanges.truncated and len(exchanges.items) < limit) or (
+        facilities.truncated and len(facilities.items) < limit
+    )
+    return f"{_SELF_REPORTED} Showing {' and '.join(cuts)}" + (
+        " — as much as the answer budget fits."
+        if budget_bound
+        else f"; raise limit for more, at most {MAX_LIMIT}."
     )
 
 

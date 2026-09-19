@@ -45,6 +45,75 @@ from peering_mcp.models.upstream import (
     UpstreamNetworkFacility,
     UpstreamNetworkIxLan,
 )
+from peering_mcp.sanitize import clean
+
+#: How long a name may be inside a *list entry*. The sanitiser's 200-character
+#: cap is the limit for a value this server will emit at all; this is the
+#: tighter one for a value repeated fifty times in one answer.
+#:
+#: **60 characters, measured rather than guessed.** Of 194 real exchange and
+#: network names across the recorded fixtures, exactly one is longer — a
+#: 75-character German research institute — and a page of fifty at the cap
+#: costs 3 KB less than a page of fifty at 200.
+#:
+#: Applied to a list entry's city as well as its name, for exactly the same
+#: reason: NL-ix records "Amsterdam, Rotterdam, Brussels, Luxembourg,
+#: Frankfurt, Düsseldorf, Berlin, Dublin, London, Copenhagen, Paris,
+#: Marseille" in one city field, which is 130 characters of an entry that is
+#: supposed to cost about a hundred.
+#:
+#: Deliberately **not** applied to candidates from an ambiguous search, or to
+#: the single object a lookup resolves to. A candidate list is a choice, and
+#: two names that differ only in their tail must not be truncated into the
+#: same string; a resolved object is where somebody goes *for* the full name.
+LIST_ENTRY_NAME_LIMIT = 60
+
+
+def list_name(value: str) -> str:
+    """A name for a list entry: cleaned already, and now shortened if long.
+
+    Truncation is marked, because a name silently cut is a wrong name
+    presented as a whole one — the same rule the sanitiser follows, reused
+    here rather than restated.
+    """
+    return clean(value, max_length=LIST_ENTRY_NAME_LIMIT)
+
+
+def list_name_optional(value: str | None) -> str | None:
+    """The same, for a field that may legitimately be absent."""
+    return None if value is None else list_name(value)
+
+
+#: How long a *descriptor* may be: the short, enum-like values an upstream
+#: writes to classify something — "NSP", "50-100Tbps", "Mostly Outbound",
+#: "Restrictive", "ASSIGNED PA", "active". Measured over 1,835 recorded
+#: records the longest real one is 20 characters, and the longest AS-SET 32;
+#: everything above that in the fixtures is the hostile record.
+DETAIL_FIELD_LIMIT = 48
+
+#: How long an identifier may be: a registry handle or the range it covers.
+#: The longest real one is an IPv6 range at 52 characters.
+IDENTIFIER_LIMIT = 64
+
+#: How long a link may be. The longest real one across the fixtures is 103.
+#: A link is only useful whole, so this is generous rather than tight — but it
+#: is not 200, because three links at 200 is most of a small tool's budget.
+URL_LIMIT = 128
+
+
+def detail(value: str | None) -> str | None:
+    """A descriptor, shortened to the length descriptors actually are."""
+    return None if value is None else clean(value, max_length=DETAIL_FIELD_LIMIT)
+
+
+def identifier(value: str | None) -> str | None:
+    """A handle or a range, shortened to the length those actually are."""
+    return None if value is None else clean(value, max_length=IDENTIFIER_LIMIT)
+
+
+def link(value: str | None) -> str | None:
+    """A URL, shortened only where it was never a URL to begin with."""
+    return None if value is None else clean(value, max_length=URL_LIMIT)
 
 
 def shape_network(record: UpstreamNetwork) -> Network:
@@ -53,24 +122,24 @@ def shape_network(record: UpstreamNetwork) -> Network:
         asn=record.asn,
         name=record.name,
         long_name=record.name_long,
-        website=record.website,
-        network_type=record.info_type,
-        traffic_estimate=record.info_traffic,
-        scope=record.info_scope,
-        traffic_ratio=record.info_ratio,
+        website=link(record.website),
+        network_type=detail(record.info_type),
+        traffic_estimate=detail(record.info_traffic),
+        scope=detail(record.info_scope),
+        traffic_ratio=detail(record.info_ratio),
         ipv4_prefixes=record.info_prefixes4,
         ipv6_prefixes=record.info_prefixes6,
         exchange_count=record.ix_count,
         facility_count=record.fac_count,
         policy=PeeringPolicy(
-            general=record.policy_general,
-            locations=record.policy_locations,
+            general=detail(record.policy_general),
+            locations=detail(record.policy_locations),
             ratio_required=record.policy_ratio,
-            contract_required=record.policy_contracts,
-            url=record.policy_url,
+            contract_required=detail(record.policy_contracts),
+            url=link(record.policy_url),
         ),
-        irr_as_set=record.irr_as_set,
-        looking_glass=record.looking_glass,
+        irr_as_set=detail(record.irr_as_set),
+        looking_glass=link(record.looking_glass),
     )
 
 
@@ -150,8 +219,8 @@ def shape_exchange_presence(
         name = group.fallback_name or f"exchange {group.ix_id}"
         city = country = None
     return ExchangePresence(
-        name=name,
-        city=city,
+        name=list_name(name),
+        city=list_name_optional(city),
         country=country,
         speed_mbps=group.speed_mbps,
         ports=len(group.ports),
@@ -161,7 +230,11 @@ def shape_exchange_presence(
 
 def shape_facility_presence(row: UpstreamNetworkFacility) -> FacilityPresence:
     """One facility entry. The `/netfac` row already carries name and place."""
-    return FacilityPresence(name=row.name, city=row.city, country=row.country)
+    return FacilityPresence(
+        name=list_name_optional(row.name),
+        city=list_name_optional(row.city),
+        country=row.country,
+    )
 
 
 def sort_facilities(rows: Iterable[UpstreamNetworkFacility]) -> list[UpstreamNetworkFacility]:
@@ -275,8 +348,8 @@ def shape_shared_exchange(
         name = group.fallback_name or f"exchange {group.ix_id}"
         city = country = None
     return SharedExchange(
-        name=name,
-        city=city,
+        name=list_name(name),
+        city=list_name_optional(city),
         country=country,
         networks=[
             ParticipantPorts(
@@ -374,7 +447,7 @@ def shape_participant(group: ExchangeGroup, network: UpstreamNetwork | None) -> 
     """
     return ExchangeParticipant(
         asn=group.asn,
-        name=network.name if network is not None else None,
+        name=list_name(network.name) if network is not None else None,
         speed_mbps=group.speed_mbps,
         ports=len(group.ports),
         route_server=group.route_server,
@@ -414,12 +487,12 @@ def shape_registration(
         target=target,
         kind=kind,
         registry=registry,
-        handle=record.handle,
+        handle=identifier(record.handle),
         holder=registration_holder(record),
-        covers=registration_range(record),
-        country=record.country,
-        allocation_type=record.allocation_type,
-        status=record.status[:MAX_STATUS_FLAGS],
+        covers=identifier(registration_range(record)),
+        country=detail(record.country),
+        allocation_type=detail(record.allocation_type),
+        status=[flag for flag in map(detail, record.status[:MAX_STATUS_FLAGS]) if flag],
         registered=event_date(record, REGISTRATION_EVENT),
         abuse=abuse_contact(record),
     )

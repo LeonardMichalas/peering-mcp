@@ -1,5 +1,7 @@
 # peering-mcp
 
+<!-- mcp-name: io.github.LeonardMichalas/peering-mcp -->
+
 [![CI](https://github.com/LeonardMichalas/peering-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardMichalas/peering-mcp/actions/workflows/ci.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue.svg)](https://www.python.org/downloads/)
 [![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2.svg)](https://modelcontextprotocol.io)
@@ -88,6 +90,96 @@ Asking `lookup_network` for `AS3320` returns this — the whole response, 854 by
 
 The `status` field is the first thing to read, and `ok` means one thing only: the answer is in `data`. A name matching several networks returns `ambiguous` with the candidates to choose between, never a guess at which one was meant. An AS number that is not listed returns `not_found`, with a note saying a network can route traffic without being registered.
 
+
+## Three questions, three answers
+
+Real responses, trimmed where marked. Nothing here is illustrative: each one is what the tool returned on 2026-09-19.
+
+**"Where could Deutsche Telekom and Hurricane Electric peer with each other?"** — one call to `find_common_presence` with `[3320, 6939]`, four upstream requests:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "networks": [
+      { "asn": 3320, "name": "Deutsche Telekom", "exchanges": 7, "facilities": 53 },
+      { "asn": 6939, "name": "Hurricane Electric", "exchanges": 335, "facilities": 342 }
+    ],
+    "exchanges": {
+      "items": [
+        {
+          "name": "NL-ix",
+          "city": "Amsterdam, Rotterdam, Brussels, Luxembourg, Frankfurt,…",
+          "country": "NL",
+          "networks": [
+            { "asn": 3320, "speed_mbps": 220000, "ports": 2, "route_server": false },
+            { "asn": 6939, "speed_mbps": 400000, "ports": 1, "route_server": true }
+          ]
+        },
+        {
+          "name": "DE-CIX Frankfurt",
+          "city": "Frankfurt",
+          "country": "DE",
+          "networks": [
+            { "asn": 3320, "speed_mbps": 110000, "ports": 1, "route_server": false },
+            { "asn": 6939, "speed_mbps": 800000, "ports": 1, "route_server": true }
+          ]
+        }
+      ],
+      "total": 6,
+      "truncated": false
+    }
+  }
+}
+```
+
+Six shared exchanges, widest bottleneck first: NL-ix leads because the narrower of the two networks has 220 Gbps there, not because anyone has more in total. The per-network totals underneath are what make an empty answer readable — Deutsche Telekom records 7 exchanges in all, so "no overlap" would mean something different from Hurricane Electric's 335.
+
+**"Who is already at DE-CIX Frankfurt, and would they peer with anyone?"** — `find_at_exchange` with `policy: "Open"`:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "exchange": { "exchange_id": 31, "name": "DE-CIX Frankfurt", "city": "Frankfurt", "country": "DE", "networks_recorded": 1020 },
+    "networks": {
+      "items": [
+        { "asn": 24940, "name": "Hetzner Online", "speed_mbps": 2800000, "ports": 3, "route_server": true, "policy": "Open" },
+        { "asn": 20940, "name": "Akamai Technologies", "speed_mbps": 2100000, "ports": 4, "route_server": true, "policy": "Open" }
+      ],
+      "total": 649,
+      "truncated": true
+    }
+  },
+  "note": "Participation is self-reported by each network in PeeringDB; a network missing here is unrecorded, not absent. Showing the 2 largest of the 649 networks (of 1020 here) stating policy Open; raise limit for more, at most 200."
+}
+```
+
+649 of the 1,020 networks there state an open policy. The filter applies to the exchange rather than to the page, so that is a count of the exchange — not "the open ones among the largest fifty".
+
+**"Who is 8.8.8.8 registered to, and where do I report abuse?"** — `lookup_registration`, which reads the registry rather than PeeringDB:
+
+```json
+{
+  "status": "ok",
+  "data": {
+    "target": "8.8.8.8",
+    "kind": "address",
+    "registry": "ARIN",
+    "handle": "NET-8-8-8-0-2",
+    "holder": "Google LLC",
+    "covers": "8.8.8.0 - 8.8.8.255",
+    "allocation_type": "DIRECT ALLOCATION",
+    "registered": "2023-12-28T17:24:33-05:00",
+    "abuse": { "name": "Abuse", "email": "network-abuse@google.com" }
+  },
+  "note": "Registry data: it says who an allocation was made to, which is not always who operates the resource today.",
+  "provenance": { "source": "rdap", "record_updated": "2023-12-28T17:24:56-05:00", "from_cache": true }
+}
+```
+
+The question was about one address and the answer covers the block it sits in, which is what `covers` is for.
+
 ## How it works
 
 <picture>
@@ -104,7 +196,7 @@ A request takes one of two paths:
   <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.svg">
 </picture>
 
-That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of 50 exchanges, largest capacity first, in about 6 KB, and says how many it left out. `find_common_presence` reads 225 KB across three networks and answers in under 4 KB.
+That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of exchanges that fits 6 KB, largest capacity first, and says how many it left out — the page is cut to the budget rather than to a count, so the limit is a ceiling and the bytes are the guarantee. `find_common_presence` reads 225 KB across three networks and answers in under 4 KB.
 
 ## Design principles
 
@@ -113,7 +205,7 @@ These are load-bearing, not aspirational. Pull requests are reviewed against the
 - **Read-only, permanently.** Only `GET` is ever sent, enforced at the transport rather than by convention. There is no write path and there will not be one.
 - **It says when it does not know.** PeeringDB is self-reported, so a missing record is common and is *not* evidence that something is untrue. The server distinguishes "this network does not exist" from "nobody filled this in", and never fills a gap with a plausible guess.
 - **Every answer carries its source and age.** Including when the upstream record was last edited, because a record untouched since 2019 deserves less weight than one edited last month.
-- **Responses are small on purpose.** Every tool returns a shaped, compact result rather than passing upstream JSON through.
+- **Responses are small on purpose, and the limit is enforced.** Every tool returns a shaped, compact result rather than passing upstream JSON through, and each one has a byte budget that a test holds it to against the worst case its own caps allow — not just against today's data. A list is cut to fit the budget, and says how many it left out.
 - **Upstream text is untrusted.** Free-text fields — PeeringDB's, written by the networks themselves, and a registry record's holder names and contacts — end up in a language model's context. They are allowlisted, length-capped and sanitised before they leave the server.
 - **Polite to upstream.** PeeringDB permits one request per second; the server holds itself to that, caches aggressively, and identifies itself in every request.
 
@@ -243,7 +335,14 @@ Each level answers a different question:
 | `tests/unit/` | Is the pure logic right? | ✅ |
 | `tests/contract/` | Does the server handle what upstream actually sends, including malformed and hostile responses? | ✅ |
 | `tests/integration/` | Does it behave as an MCP server? | ✅ |
-| `tests/eval/` | Does a model pick the right tool from its description? | planned |
+| `tests/eval/` | Does a model pick the right tool from its description? | ✅ |
+
+The evaluation is opt-in and separate from the suite: it asks a real model twenty natural-language questions with the real tool schemas, records which tool it reaches for, and costs a few cents a run.
+
+```bash
+export ANTHROPIC_API_KEY=...
+uv run --group eval python tests/eval/run_eval.py
+```
 
 **No test reaches the real API.** Upstream is mocked at the transport, so the suite runs offline and gives the same answer everywhere. The `live` marker is reserved for opt-in tests that do hit PeeringDB; CI excludes it with `-m "not live"`.
 

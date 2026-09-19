@@ -1,0 +1,112 @@
+# Twenty questions a person would actually ask, and the tool that should
+# answer each one.
+#
+# **This file tests the tool descriptions, not the tools.** Every tool here
+# works; the thing that can be wrong is what a model believes each one is for,
+# and the only evidence for that is which one it reaches for. A question that
+# selects the wrong tool is a description to rewrite, not a model to blame.
+#
+# `expect` is the tool that should be called. `accept` lists any other tool
+# that is a defensible reading of the same question — an ambiguous question
+# with one right answer is a badly written question, not a failing model.
+# `why` says what the question is testing, so a failure is diagnosable without
+# re-deriving the intent.
+
+questions:
+  # --- lookup_network: who is this network -------------------------------
+  - ask: Who is AS3320?
+    expect: lookup_network
+    why: The plainest possible lookup. If this misses, nothing else matters.
+
+  - ask: What is Hurricane Electric's peering policy?
+    expect: lookup_network
+    why: Policy lives on the network record, and the word "peering" must not
+      pull the model towards the presence tools.
+
+  - ask: I only know them as Cogent. What AS number is that?
+    expect: lookup_network
+    why: Name to AS number is the entry point every other tool depends on.
+
+  - ask: Would Deutsche Telekom peer with a small regional ISP?
+    expect: lookup_network
+    why: A judgement question whose evidence is a policy field. The tool
+      should be reached for rather than answered from memory.
+
+  # --- list_presence: where is one network -------------------------------
+  - ask: Which internet exchanges is AS6939 present at?
+    expect: list_presence
+    why: One network, one list. The tool this was designed for.
+
+  - ask: Which data centres can I meet AS3320 in?
+    expect: list_presence
+    why: Facilities rather than exchanges, and the tool covers both.
+
+  - ask: Where is Cloudflare present?
+    expect: list_presence
+    accept: [lookup_network]
+    why: Deliberately vague. Presence is the better reading; the counts on
+      the network record are a defensible one.
+
+  - ask: How much port capacity does AS6939 have at each exchange it joins?
+    expect: list_presence
+    why: The speed fields are on the presence entries, not the network.
+
+  # --- find_common_presence: where can several meet ----------------------
+  - ask: Where could Deutsche Telekom and Hurricane Electric peer with each other?
+    expect: find_common_presence
+    why: The flagship question, in the words somebody would use.
+
+  - ask: Do AS3320 and AS6939 share any exchange?
+    expect: find_common_presence
+    why: The same question as a yes-or-no. It must not become two
+      list_presence calls and a comparison.
+
+  - ask: We are AS3320. Which exchanges would let us reach both AS6939 and AS6695 in one place?
+    expect: find_common_presence
+    why: Three networks. The intersection is the tool's whole job.
+
+  - ask: Is there anywhere in Europe that AS6939, AS6695 and AS3320 are all present?
+    expect: find_common_presence
+    why: A geographic qualifier the tool cannot filter on. It should still
+      be the tool, with the filtering left to the caller.
+
+  # --- find_at_exchange: who is at one exchange --------------------------
+  - ask: Who else is at DE-CIX Frankfurt?
+    expect: find_at_exchange
+    why: The inverse of list_presence, and the phrasing an operator uses.
+
+  - ask: We are joining LINX LON1. Which networks there would peer with us openly?
+    expect: find_at_exchange
+    why: The policy filter belongs to this tool, and this is the question it
+      was added for.
+
+  - ask: How many networks are at BCIX in Berlin?
+    expect: find_at_exchange
+    why: A count, not a list. The tool answers it and the model should not
+      decide a count needs no lookup.
+
+  - ask: Is AS6939 at AMS-IX?
+    expect: find_at_exchange
+    accept: [list_presence]
+    why: One network and one exchange, which either tool can answer. Both
+      readings are honest; neither should be an invented yes.
+
+  # --- lookup_registration: whose is this --------------------------------
+  - ask: Who owns 8.8.8.8?
+    expect: lookup_registration
+    why: The registry question in four words.
+
+  - ask: Which organisation is 193.0.0.0/21 registered to?
+    expect: lookup_registration
+    why: A prefix rather than an address, and "registered" is the word the
+      description leans on.
+
+  - ask: Where do I report abuse coming from 1.1.1.1?
+    expect: lookup_registration
+    why: The abuse contact is registry data. Nothing in PeeringDB has it.
+
+  - ask: When was AS6939 allocated, and by which registry?
+    expect: lookup_registration
+    why: An AS number question that is *not* lookup_network — allocation
+      dates come from RDAP, and this is the sharpest boundary between the
+      two tools that both take an AS number.

@@ -20,7 +20,7 @@ import pytest
 import respx
 
 from peering_mcp.clients.peeringdb import PeeringDBClient
-from peering_mcp.config import Config
+from peering_mcp.config import RESPONSE_BUDGETS, Config
 from peering_mcp.models.domain import Status
 from peering_mcp.tools.list_presence import MAX_LIMIT, list_presence
 
@@ -28,8 +28,11 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "peeringdb"
 API = "https://www.peeringdb.com/api"
 
 #: Budgets in bytes of compact JSON, the figure the design states them in.
-LIST_BUDGET = 6 * 1024
-BOTH_BUDGET = 10 * 1024
+LIST_BUDGET = RESPONSE_BUDGETS["list_presence"]
+#: `kind="both"` returns two lists, and the budget is per list — so two of
+#: them is the line, not one. Real data lands far inside it; the point of the
+#: number is that it is derived rather than invented.
+BOTH_BUDGET = 2 * LIST_BUDGET
 
 
 def fixture(name: str) -> dict[str, Any]:
@@ -88,7 +91,7 @@ async def test_exchanges_are_a_page_with_the_total(
     page = result.data.exchanges
     assert page.total == 335
     assert page.truncated is True
-    assert len(page.items) == 50
+    assert 0 < len(page.items) <= 50, "the limit is a ceiling, the budget may lower it"
     assert result.data.facilities is None, "not asked for, so not there"
 
 
@@ -147,9 +150,13 @@ async def test_the_note_says_what_was_cut_in_one_sentence(
 ) -> None:
     result = await call(config, asn=6939, kind="both")
 
-    assert "50 of 335 exchanges" in result.note
-    assert "50 of 343 facilities" in result.note
-    assert str(MAX_LIMIT) in result.note
+    exchanges = len(result.data.exchanges.items)
+    facilities = len(result.data.facilities.items)
+    assert f"{exchanges} of 335 exchanges" in result.note
+    assert f"{facilities} of 343 facilities" in result.note
+    assert "answer budget" in result.note, (
+        "the budget cut these pages, so raising the limit would return the same ones"
+    )
     assert result.note.count(". ") <= 2, "a caveat longer than that stops being read"
 
 
@@ -178,8 +185,10 @@ async def test_a_page_of_the_largest_network_fits_the_budget(
 async def test_the_cap_is_a_cap(config: Config, hurricane: dict[str, respx.Route]) -> None:
     result = await call(config, asn=6939, kind="ix", limit=10_000)
 
-    assert len(result.data.exchanges.items) == MAX_LIMIT
-    assert result.data.exchanges.truncated is True
+    page = result.data.exchanges
+    assert 0 < len(page.items) <= MAX_LIMIT, "clamped to MAX_LIMIT, then to what fits"
+    assert page.truncated is True
+    assert compact_size(result) <= RESPONSE_BUDGETS["list_presence"]
 
 
 @respx.mock

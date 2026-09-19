@@ -22,7 +22,7 @@ import pytest
 import respx
 
 from peering_mcp.clients.rdap import IANA_BOOTSTRAP_URL, RdapClient
-from peering_mcp.config import Config
+from peering_mcp.config import RESPONSE_BUDGETS, Config
 from peering_mcp.models.domain import Status
 from peering_mcp.tools.lookup_registration import lookup_registration
 
@@ -35,7 +35,7 @@ APNIC = "https://rdap.apnic.net"
 #: The budget for this tool, in bytes of compact JSON. The largest real answer
 #: measured against live registries on 2026-09-18 was 673 bytes, for a RIPE
 #: IPv6 record whose holder's name runs to 58 characters.
-BUDGET = 2 * 1024
+BUDGET = RESPONSE_BUDGETS["lookup_registration"]
 
 
 def fixture(name: str) -> dict[str, Any]:

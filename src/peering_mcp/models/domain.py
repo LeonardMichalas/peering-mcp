@@ -8,6 +8,7 @@ and a missing record is not evidence that something is untrue.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Literal
@@ -158,7 +159,7 @@ class FacilityPresence(BaseModel):
     country: str | None = Field(default=None, description="ISO 3166-1 two-letter code.")
 
 
-class Page[T](BaseModel):
+class Page[T: BaseModel](BaseModel):
     """A bounded slice of a list, and how much of the list it is.
 
     `total` and `truncated` travel with the items so a caller can never mistake
@@ -168,6 +169,32 @@ class Page[T](BaseModel):
     items: list[T]
     total: int = Field(description="How many there are in all, not just on this page.")
     truncated: bool = Field(description="True when items holds fewer than total.")
+
+    @classmethod
+    def within_budget(cls, items: Sequence[T], *, total: int, budget: int) -> Page[T]:
+        """The longest prefix of `items` that fits `budget` bytes of JSON.
+
+        **A byte budget that entries can overrun is not a budget.** A count
+        limit bounds a response only if every entry is about the same size, and
+        entries are mostly names: fifty at the 60-character cap measure 8,838
+        bytes against a 6 KB line, while fifty real ones measure 5,879. So the
+        count says how many a caller wants and this says how many will fit, and
+        the smaller of the two wins.
+
+        Nothing is lost by it, because `total` and `truncated` already exist to
+        say so. A caller that cannot see what was cut is the failure this
+        model was built to prevent; a caller told "50 of 1,020, truncated" and
+        one told "38 of 1,020, truncated" are equally well informed.
+        """
+        kept: list[T] = []
+        spent = 0
+        for item in items:
+            # The comma or bracket that joins this entry to the last one.
+            spent += len(item.model_dump_json()) + 1
+            if spent > budget:
+                break
+            kept.append(item)
+        return cls(items=kept, total=total, truncated=len(kept) < total)
 
 
 class PresenceList(BaseModel):

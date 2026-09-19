@@ -29,7 +29,7 @@ import respx
 from peering_mcp.clients.http import HttpCore
 from peering_mcp.clients.peeringdb import PeeringDBClient
 from peering_mcp.clients.rate_limit import RateLimiter
-from peering_mcp.config import Config
+from peering_mcp.config import RESPONSE_BUDGETS, Config
 from peering_mcp.models.domain import Status
 from peering_mcp.tools.find_common_presence import MAX_ASNS, MAX_LIMIT, find_common_presence
 
@@ -37,7 +37,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "peeringdb"
 API = "https://www.peeringdb.com/api"
 
 #: The design states this tool's budget as 4 KB of compact JSON.
-BUDGET = 4 * 1024
+BUDGET = RESPONSE_BUDGETS["find_common_presence"]
 
 TELEKOM = 3320
 DE_CIX_ROUTE_SERVERS = 6695

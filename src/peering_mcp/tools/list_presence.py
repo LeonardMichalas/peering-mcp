@@ -21,10 +21,11 @@ Four upstream requests at most, in this order and for these reasons:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from peering_mcp.clients.http import Fetched
 from peering_mcp.clients.peeringdb import PeeringDBClient
+from peering_mcp.config import list_budget
 from peering_mcp.errors import UpstreamError, UpstreamNotFoundError
 from peering_mcp.models.domain import (
     ExchangePresence,
@@ -110,13 +111,15 @@ async def _list(
         detail = await client.exchanges_by_id(group.ix_id for group in page)
         fetches.append(detail)
         by_id = {record.record_id: record for record in detail.value}
-        exchanges = Page(
-            items=[shape_exchange_presence(group, by_id.get(group.ix_id)) for group in page],
+        exchanges = Page[ExchangePresence].within_budget(
+            [shape_exchange_presence(group, by_id.get(group.ix_id)) for group in page],
             total=len(groups),
-            truncated=len(groups) > limit,
+            budget=list_budget("list_presence"),
         )
         if exchanges.truncated:
-            cuts.append(f"{limit} of {exchanges.total} exchanges (largest ports first)")
+            cuts.append(
+                f"{len(exchanges.items)} of {exchanges.total} exchanges (largest ports first)"
+            )
 
     if kind in ("facility", "both"):
         if network.record_id is None:
@@ -130,13 +133,13 @@ async def _list(
         fetches.append(sites)
         rows.extend(sites.value)
         ordered = sort_facilities(sites.value)
-        facilities = Page(
-            items=[shape_facility_presence(row) for row in ordered[:limit]],
+        facilities = Page[FacilityPresence].within_budget(
+            [shape_facility_presence(row) for row in ordered[:limit]],
             total=len(ordered),
-            truncated=len(ordered) > limit,
+            budget=list_budget("list_presence"),
         )
         if facilities.truncated:
-            cuts.append(f"{limit} of {facilities.total} facilities (by country)")
+            cuts.append(f"{len(facilities.items)} of {facilities.total} facilities (by country)")
 
     provenance = Provenance.now(
         "peeringdb",
@@ -156,16 +159,33 @@ async def _list(
         data=PresenceList(
             asn=asn, network=network.name, exchanges=exchanges, facilities=facilities
         ),
-        note=_SELF_REPORTED + _truncation_note(cuts),
+        note=_SELF_REPORTED
+        + _truncation_note(
+            cuts,
+            budget_bound=_budget_bound(exchanges, limit) or _budget_bound(facilities, limit),
+        ),
         provenance=provenance,
     )
 
 
-def _truncation_note(cuts: list[str]) -> str:
-    """One sentence saying what was cut and how to get the rest, or nothing."""
+def _truncation_note(cuts: list[str], *, budget_bound: bool) -> str:
+    """One sentence saying what was cut, and whether asking again would help.
+
+    **"Raise limit for more" is only true when the limit is what cut the
+    list.** When the answer budget cut it first, the same advice invites a
+    second identical call, and a tool that asks to be called again for nothing
+    is worse than one that says the page is full.
+    """
     if not cuts:
         return ""
+    if budget_bound:
+        return f" Showing {' and '.join(cuts)} — as much as the answer budget fits."
     return f" Showing {' and '.join(cuts)}; raise limit for more, at most {MAX_LIMIT}."
+
+
+def _budget_bound(page: Page[Any] | None, limit: int) -> bool:
+    """Whether the answer budget, rather than the caller's limit, cut this list."""
+    return page is not None and page.truncated and len(page.items) < limit
 
 
 def _not_found(asn: int) -> ToolResult[PresenceList]:
