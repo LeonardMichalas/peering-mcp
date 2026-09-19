@@ -1,6 +1,6 @@
 [project]
 name = "peering-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "An MCP server that gives AI agents access to public internet interconnection data: who peers with whom, where, and under what policy."
 readme = "README.md"
 requires-python = ">=3.12"

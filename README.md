@@ -7,13 +7,13 @@
 [![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2.svg)](https://modelcontextprotocol.io)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![mypy: strict](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
-[![Licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](LICENSE)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-green.svg)](https://github.com/LeonardMichalas/peering-mcp/blob/main/LICENSE)
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** All five tools work against live data, across both upstreams: PeeringDB for interconnection, and the regional internet registries over RDAP for registration. The foundations under them are in place — upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. Every response is held to a byte budget against the worst case its own caps allow, and a tool-selection evaluation scores 20 of 20 on picking the right tool from the descriptions alone. Published on PyPI as [`peering-mcp`](https://pypi.org/project/peering-mcp/).
+Five read-only tools over two public sources: [PeeringDB](https://www.peeringdb.com) for interconnection, and the regional internet registries over [RDAP](https://about.rdap.org/) for registration. Upstream responses are validated and shaped, free text is stripped of structure before it reaches a model, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. Every response is held to a byte budget.
 
-> A personal side project, written in my own free time.
+Install it with `uvx peering-mcp`. A personal project, MIT licensed.
 
 ## Why this exists
 
@@ -25,13 +25,13 @@ This server is that way to check.
 
 ## What it does
 
-| Tool | Question it answers | |
-| --- | --- | --- |
-| `lookup_network` | Who is this network, and what is their peering policy? | ✅ |
-| `list_presence` | Which internet exchanges and facilities are they present at? | ✅ |
-| `find_at_exchange` | Who else is at this exchange, and would they peer? | ✅ |
-| `find_common_presence` | **Where can these networks meet each other?** | ✅ |
-| `lookup_registration` | Who is this IP range or AS number registered to? | ✅ |
+| Tool | Question it answers |
+| --- | --- |
+| `lookup_network` | Who is this network, and what is their peering policy? |
+| `list_presence` | Which internet exchanges and facilities are they present at? |
+| `find_at_exchange` | Who else is at this exchange, and would they peer? |
+| `find_common_presence` | **Where can these networks meet each other?** |
+| `lookup_registration` | Who is this IP range or AS number registered to? |
 
 `find_common_presence` is the tool that motivated the project. Working out where two or more networks could interconnect means looking each one up, listing everywhere it is present, and intersecting the results by hand. That is about an hour and a dozen browser tabs. It should be one question.
 
@@ -183,8 +183,8 @@ The question was about one address and the answer covers the block it sits in, w
 ## How it works
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
-  <img alt="The agent talks to peering-mcp over stdio. Only the server reaches the public internet, sending HTTPS GET requests to PeeringDB and RDAP, and reading from and writing to a local disk cache." src="docs/images/architecture-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/LeonardMichalas/peering-mcp/main/docs/images/architecture-dark.svg">
+  <img alt="The agent talks to peering-mcp over stdio. Only the server reaches the public internet, sending HTTPS GET requests to PeeringDB and RDAP, and reading from and writing to a local disk cache." src="https://raw.githubusercontent.com/LeonardMichalas/peering-mcp/main/docs/images/architecture-light.svg">
 </picture>
 
 The agent never reaches the internet itself. Everything goes through the server, which is the only place rate limiting, caching, validation and sanitisation can actually be enforced.
@@ -192,15 +192,15 @@ The agent never reaches the internet itself. Everything goes through the server,
 A request takes one of two paths:
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/request-dark.svg">
-  <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="docs/images/request-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/LeonardMichalas/peering-mcp/main/docs/images/request-dark.svg">
+  <img alt="A lookup asks the disk cache first. A hit ends there. A miss waits for the rate limiter, fetches up to 130 KB of JSON from PeeringDB, then validates, sanitises, shapes and stores it before returning 854 bytes to the agent." src="https://raw.githubusercontent.com/LeonardMichalas/peering-mcp/main/docs/images/request-light.svg">
 </picture>
 
 That shaping step is not cosmetic. One network's raw presence records can exceed 130 KB, and returning that would flood the agent's context window and make it measurably worse at the actual task. `list_presence` turns Hurricane Electric's 336 exchange ports into a page of exchanges that fits 6 KB, largest capacity first, and says how many it left out — the page is cut to the budget rather than to a count, so the limit is a ceiling and the bytes are the guarantee. `find_common_presence` reads 225 KB across three networks and answers in under 4 KB.
 
 ## Design principles
 
-These are load-bearing, not aspirational. Pull requests are reviewed against them.
+These are load-bearing rather than aspirational, and pull requests are reviewed against them.
 
 - **Read-only, permanently.** Only `GET` is ever sent, enforced at the transport rather than by convention. There is no write path and there will not be one.
 - **It says when it does not know.** PeeringDB is self-reported, so a missing record is common and is *not* evidence that something is untrue. The server distinguishes "this network does not exist" from "nobody filled this in", and never fills a gap with a plausible guess.
@@ -218,7 +218,7 @@ All public, all free, no scraping.
 | [PeeringDB API v2](https://www.peeringdb.com/apidocs/) | Networks, exchanges, facilities, presence, peering policy | API key recommended, not required | Free |
 | [RDAP](https://about.rdap.org/) | Registration data for IPs, prefixes and AS numbers, via the [IANA bootstrap files](https://data.iana.org/rdap/) | None | Free |
 
-Later versions may add observed routing data from [RIPEstat](https://stat.ripe.net) and topology from [CAIDA AS Rank](https://asrank.caida.org).
+Observed routing from [RIPEstat](https://stat.ripe.net) and topology from [CAIDA AS Rank](https://asrank.caida.org) are deliberately out of scope: they answer what the internet is doing, where this answers who is connected to whom and on what terms.
 
 ## Requirements
 
@@ -330,14 +330,14 @@ Everything has a working default. The server starts and answers questions with n
 
 ### Tests
 
-Each level answers a different question:
+Four levels, each proving something the others cannot:
 
-| Directory | Answers | |
-| --- | --- | --- |
-| `tests/unit/` | Is the pure logic right? | ✅ |
-| `tests/contract/` | Does the server handle what upstream actually sends, including malformed and hostile responses? | ✅ |
-| `tests/integration/` | Does it behave as an MCP server? | ✅ |
-| `tests/eval/` | Does a model pick the right tool from its description? | ✅ |
+| Directory | What it proves |
+| --- | --- |
+| `tests/unit/` | The pure logic: shaping, sanitising, bootstrap matching, rate limiting, and every response-size budget against the worst case its caps allow |
+| `tests/contract/` | The server handles what upstream actually sends, including malformed, truncated and hostile responses |
+| `tests/integration/` | It behaves as an MCP server: schemas, envelope and every status, through the SDK |
+| `tests/eval/` | A model picks the right tool from the description alone |
 
 The evaluation is opt-in and separate from the suite: it asks a real model twenty natural-language questions with the real tool schemas, records which tool it reaches for, and costs about $0.50 a run. It scores 20 of 20 on Claude Opus 5 at low effort.
 
@@ -358,4 +358,4 @@ Issues and pull requests are welcome. Before opening a PR:
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/LeonardMichalas/peering-mcp/blob/main/LICENSE).
