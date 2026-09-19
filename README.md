@@ -11,7 +11,7 @@
 
 **An MCP server that lets an AI agent look up how the internet is actually wired together** — which networks connect to each other, at which internet exchanges and facilities, under what peering policy, and who a given address range is registered to.
 
-> **Status: early development.** All five tools work against live data, across both upstreams: PeeringDB for interconnection, and the regional internet registries over RDAP for registration. The foundations under them are in place — upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. Response-size budgets and a tool-selection evaluation are next. Nothing is published to PyPI yet.
+> **Status: early development.** All five tools work against live data, across both upstreams: PeeringDB for interconnection, and the regional internet registries over RDAP for registration. The foundations under them are in place — upstream responses are validated and shaped, untrusted text is stripped of structure, requests are rate limited to what PeeringDB asks for, and answers are cached on disk between runs. Every response is held to a byte budget against the worst case its own caps allow, and a tool-selection evaluation scores 20 of 20 on picking the right tool from the descriptions alone. Published on PyPI as [`peering-mcp`](https://pypi.org/project/peering-mcp/).
 
 > A personal side project, written in my own free time.
 
@@ -228,12 +228,12 @@ Later versions may add observed routing data from [RIPEstat](https://stat.ripe.n
 
 ## Use it with an agent
 
-Until it is published, point your agent at a local checkout.
+Nothing to install first: `uvx` fetches the package and runs it.
 
 **Claude Code:**
 
 ```bash
-claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mcp
+claude mcp add peering-mcp -- uvx peering-mcp
 ```
 
 **Anything that reads a JSON MCP config:**
@@ -242,12 +242,14 @@ claude mcp add peering-mcp -- uv run --directory /path/to/peering-mcp peering-mc
 {
   "mcpServers": {
     "peering-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/peering-mcp", "peering-mcp"]
+      "command": "uvx",
+      "args": ["peering-mcp"]
     }
   }
 }
 ```
+
+To run a local checkout instead — for development, or to try a change — swap the command for `uv run --directory /path/to/peering-mcp peering-mcp`.
 
 Then ask it something an agent normally gets wrong: *"Where could Deutsche Telekom and Hurricane Electric peer with each other?"*
 
