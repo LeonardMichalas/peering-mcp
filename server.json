@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.LeonardMichalas/peering-mcp",
-  "description": "Look up how networks connect on the public internet: who peers with whom, where they meet, under what policy, and who an address range is registered to.",
+  "description": "Who peers with whom, where they meet, and who an address range belongs to. PeeringDB and RDAP.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/LeonardMichalas/peering-mcp",
   "repository": {
