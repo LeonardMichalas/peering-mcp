@@ -337,7 +337,7 @@ Each level answers a different question:
 | `tests/integration/` | Does it behave as an MCP server? | ✅ |
 | `tests/eval/` | Does a model pick the right tool from its description? | ✅ |
 
-The evaluation is opt-in and separate from the suite: it asks a real model twenty natural-language questions with the real tool schemas, records which tool it reaches for, and costs a few cents a run.
+The evaluation is opt-in and separate from the suite: it asks a real model twenty natural-language questions with the real tool schemas, records which tool it reaches for, and costs about $0.50 a run. It scores 20 of 20 on Claude Opus 5 at low effort.
 
 ```bash
 export ANTHROPIC_API_KEY=...

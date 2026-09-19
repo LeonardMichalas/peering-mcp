@@ -3,11 +3,20 @@
 Run by hand, never in CI: it calls a real model, costs real money, and its
 result is a number to read rather than a gate to pass.
 
-**What it measures, and what it does not.** Each question goes to Claude once,
-with the five real tool schemas this server advertises and the server's own
-instructions as the system prompt, and nothing is executed — the answer being
-graded is which tool the model reached for, not what came back. So a failure
-here is a *description* that misleads, and the fix is prose in `server.py`.
+**What it measures, and what it does not.** Each question goes to Claude with
+the five real tool schemas this server advertises and the server's own
+instructions as the system prompt, and nothing is really executed — the answer
+being graded is which tool the model reached for, not what came back. So a
+failure here is a *description* that misleads, and the fix is prose in
+`server.py`.
+
+**One hop is allowed, because the tools ask for it.** A question that names
+networks rather than AS numbers cannot be answered by the tool that answers it:
+`find_common_presence` takes integers, and its own description says to get them
+from `lookup_network` first. Grading the first call alone marked that obedience
+as a failure. So when the model resolves a name, the harness answers with a
+plausible `lookup_network` result and grades what it reaches for next. Anything
+past that hop is a wrong tool.
 
 The tool schemas come from the server itself rather than from a copy, so the
 descriptions under test are the ones a client would actually receive.
@@ -23,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -50,6 +60,8 @@ DEFAULT_EFFORT = "low"
 MAX_TOKENS = 4096
 
 #: Claude Opus 5, US dollars per million tokens, for the cost line at the end.
+#: A full run costs about $0.50, nearly all of it input: five tool schemas are
+#: roughly 4,500 tokens, and every question pays for all of them.
 INPUT_COST = 5.00
 OUTPUT_COST = 25.00
 
@@ -73,6 +85,7 @@ class Outcome:
     arguments: dict[str, Any]
     input_tokens: int
     output_tokens: int
+    hopped: bool = False
 
     @property
     def verdict(self) -> str:
@@ -114,6 +127,40 @@ async def tool_schemas() -> list[dict[str, Any]]:
     ]
 
 
+#: AS numbers for the networks the questions name, so a resolution hop can be
+#: answered with something that looks like a real result rather than a stub.
+KNOWN_ASNS = {
+    "deutsche telekom": (3320, "Deutsche Telekom"),
+    "telekom": (3320, "Deutsche Telekom"),
+    "hurricane": (6939, "Hurricane Electric"),
+    "cogent": (174, "Cogent Communications"),
+    "cloudflare": (13335, "Cloudflare"),
+}
+
+
+def resolved(query: str) -> str:
+    """A `lookup_network` answer for a name, in the shape the real tool returns."""
+    lowered = query.lower()
+    asn, name = next(
+        ((asn, name) for key, (asn, name) in KNOWN_ASNS.items() if key in lowered),
+        (65001, "Example Network"),
+    )
+    return json.dumps(
+        {
+            "status": "ok",
+            "data": {
+                "network": {"asn": asn, "name": name, "policy": {"general": "Selective"}},
+                "candidates": [],
+            },
+            "note": "PeeringDB records are maintained by the networks themselves.",
+        }
+    )
+
+
+def first_tool_use(content: list[Any]) -> Any | None:
+    return next((block for block in content if block.type == "tool_use"), None)
+
+
 def ask_once(
     client: anthropic.Anthropic,
     question: Question,
@@ -122,39 +169,81 @@ def ask_once(
     model: str,
     effort: str,
 ) -> Outcome:
-    """One question, one call, no execution.
+    """One question, at most one name-resolution hop, nothing really executed.
 
     `tool_choice` is left on auto on purpose. Forcing a call would measure
     only the choice between tools and would hide the failure this project
     exists to prevent: a model answering an interconnection question from
     memory because nothing told it there was something to look up.
     """
-    response = client.messages.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        system=INSTRUCTIONS,
-        tools=tools,
-        output_config={"effort": effort},
-        messages=[{"role": "user", "content": question.ask}],
-    )
+    messages: list[dict[str, Any]] = [{"role": "user", "content": question.ask}]
+    inputs = outputs = 0
+    hopped = False
 
-    for block in response.content:
-        if block.type == "tool_use":
-            arguments = block.input if isinstance(block.input, dict) else {}
+    for _ in range(2):
+        response = client.messages.create(
+            model=model,
+            max_tokens=MAX_TOKENS,
+            system=INSTRUCTIONS,
+            tools=tools,
+            output_config={"effort": effort},
+            messages=messages,
+        )
+        inputs += response.usage.input_tokens
+        outputs += response.usage.output_tokens
+
+        calls = [block for block in response.content if block.type == "tool_use"]
+        if not calls:
+            break
+
+        called = {call.name for call in calls}
+        if called & set(question.allowed) or hopped:
+            chosen = next((call for call in calls if call.name in question.allowed), calls[0])
             return Outcome(
                 question=question,
-                called=block.name,
-                arguments=arguments,
-                input_tokens=response.usage.input_tokens,
-                output_tokens=response.usage.output_tokens,
+                called=chosen.name,
+                arguments=chosen.input if isinstance(chosen.input, dict) else {},
+                input_tokens=inputs,
+                output_tokens=outputs,
+                hopped=hopped,
             )
+
+        if called != {"lookup_network"}:
+            return Outcome(
+                question=question,
+                called=calls[0].name,
+                arguments=calls[0].input if isinstance(calls[0].input, dict) else {},
+                input_tokens=inputs,
+                output_tokens=outputs,
+                hopped=hopped,
+            )
+
+        # A name-resolution hop, which the tools themselves ask for. Answer
+        # every call in one user message — splitting them teaches the model to
+        # stop calling tools in parallel — and look at what comes next.
+        hopped = True
+        messages.append({"role": "assistant", "content": response.content})
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": call.id,
+                        "content": resolved(str(call.input.get("query", ""))),
+                    }
+                    for call in calls
+                ],
+            }
+        )
 
     return Outcome(
         question=question,
         called=None,
         arguments={},
-        input_tokens=response.usage.input_tokens,
-        output_tokens=response.usage.output_tokens,
+        input_tokens=inputs,
+        output_tokens=outputs,
+        hopped=hopped,
     )
 
 
@@ -166,6 +255,8 @@ def report(outcomes: list[Outcome], *, model: str, effort: str) -> int:
     for outcome in outcomes:
         mark = {"ok": "  ", "accepted": "~ ", "WRONG": "! ", "NO CALL": "! "}[outcome.verdict]
         called = outcome.called or "nothing"
+        if outcome.hopped:
+            called += "  (after resolving a name)"
         print(f"{mark}{outcome.question.ask:<{width}}  {called}")
         if not outcome.passed:
             print(f"{'':>{width + 4}}expected {outcome.question.expect} — {outcome.question.why}")

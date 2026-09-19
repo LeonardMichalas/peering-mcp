@@ -73,13 +73,17 @@ async def lookup_network(query: str) -> ToolResult[NetworkLookup]:
             name such as "Hurricane".
 
     Returns:
-        The network's name, type, self-reported traffic and scope, how many
-        exchanges and facilities it records a presence at, and its peering
-        policy. The policy is the part that answers "would they peer with us".
+        The network's name, type, self-reported traffic and scope, a count of
+        how many exchanges and facilities it records a presence at, and its
+        peering policy. The policy is the part that answers "would they peer
+        with us". The presence figures are counts only — "7 exchanges, 53
+        facilities" — and never say which ones.
 
-    Do not use this to find *where* two networks can meet; that is
-    find_common_presence. Do not use it for registration or ownership of an
-    address range; that is lookup_registration.
+    Do not use this to find which exchanges or data centres a network is
+    present at; it counts them and list_presence names them. Do not use it to
+    find *where* two networks can meet; that is find_common_presence. Do not
+    use it for registration or ownership of an address range; that is
+    lookup_registration.
 
     Read the status before the data. A status of ok means one network
     resolved and is in data.network. A status of ambiguous means the name
